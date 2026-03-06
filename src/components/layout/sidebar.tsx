@@ -1,13 +1,8 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
+import { getLastReposPath } from "@/lib/repos-cache";
 import type { Theme } from "@/hooks/use-theme";
-
-const navItems = [
-  { to: "/", label: "Repos", icon: "[]" },
-  { to: "/assigned", label: "Assigned", icon: "@" },
-  { to: "/settings", label: "Settings", icon: "{}" },
-];
 
 interface SidebarProps {
   collapsed: boolean;
@@ -58,30 +53,7 @@ export function Sidebar({
       <Separator />
 
       {/* Nav links */}
-      <nav className="flex flex-1 flex-col gap-1 p-2">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === "/"}
-            title={collapsed ? item.label : undefined}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
-                collapsed && "justify-center px-2",
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-              )
-            }
-          >
-            <span className="font-mono text-xs opacity-60 shrink-0">
-              {item.icon}
-            </span>
-            {!collapsed && <span className="truncate">{item.label}</span>}
-          </NavLink>
-        ))}
-      </nav>
+      <NavItems collapsed={collapsed} />
 
       {/* Theme toggle at bottom */}
       <Separator />
@@ -102,6 +74,52 @@ export function Sidebar({
         </button>
       </div>
     </aside>
+  );
+}
+
+const staticNavItems = [
+  { to: "/assigned", label: "Assigned", icon: "@" },
+  { to: "/settings", label: "Settings", icon: "{}" },
+];
+
+function NavItems({ collapsed }: { collapsed: boolean }) {
+  const location = useLocation();
+  const reposPath = getLastReposPath();
+  const isReposArea = location.pathname === "/" || location.pathname.startsWith("/review/");
+
+  const linkClass = (active: boolean) =>
+    cn(
+      "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+      collapsed && "justify-center px-2",
+      active
+        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+    );
+
+  return (
+    <nav className="flex flex-1 flex-col gap-1 p-2">
+      <NavLink
+        to={reposPath}
+        title={collapsed ? "Repos" : undefined}
+        className={linkClass(isReposArea)}
+      >
+        <span className="font-mono text-xs opacity-60 shrink-0">[]</span>
+        {!collapsed && <span className="truncate">Repos</span>}
+      </NavLink>
+      {staticNavItems.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          title={collapsed ? item.label : undefined}
+          className={({ isActive }) => linkClass(isActive)}
+        >
+          <span className="font-mono text-xs opacity-60 shrink-0">
+            {item.icon}
+          </span>
+          {!collapsed && <span className="truncate">{item.label}</span>}
+        </NavLink>
+      ))}
+    </nav>
   );
 }
 

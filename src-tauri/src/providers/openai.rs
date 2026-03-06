@@ -1,4 +1,4 @@
-use super::traits::{build_review_user_message, review_system_prompt, AiError, AiProvider};
+use super::traits::{build_review_user_message, review_system_prompt, strip_markdown_fences, AiError, AiProvider};
 use crate::models::provider::AiModelInfo;
 use crate::models::review::{AiReviewSummary, ReviewPrompt};
 use async_trait::async_trait;
@@ -73,7 +73,8 @@ impl AiProvider for OpenAiProvider {
             .first()
             .ok_or_else(|| AiError::Parse("Empty response from OpenAI".into()))?;
 
-        serde_json::from_str(&choice.message.content)
+        let json_str = strip_markdown_fences(&choice.message.content);
+        serde_json::from_str(json_str)
             .map_err(|e| AiError::Parse(format!("Failed to parse review JSON: {e}")))
     }
 

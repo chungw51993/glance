@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { getReviewCache, updateReviewCache } from "@/lib/review-cache";
+import { setLastReposPath } from "@/lib/repos-cache";
 import { useReview } from "@/hooks/use-review";
 import { useReviewDraft } from "@/hooks/use-review-draft";
 import { useLayoutPreferences } from "@/hooks/use-layout-preferences";
@@ -29,6 +30,13 @@ export function ReviewPage() {
 
   const cached = prKey ? getReviewCache(prKey) : null;
   const [aiPanelOpen, setAiPanelOpen] = useState(cached?.aiPanelOpen ?? false);
+
+  // Register this page as the last repos-area path
+  useEffect(() => {
+    if (owner && name && prNumber) {
+      setLastReposPath(`/review/${owner}/${name}/${prNumber}`);
+    }
+  }, [owner, name, prNumber]);
 
   // Sync aiPanelOpen to cache
   useEffect(() => {

@@ -1,4 +1,4 @@
-use super::traits::{build_review_user_message, review_system_prompt, AiError, AiProvider};
+use super::traits::{build_review_user_message, review_system_prompt, strip_markdown_fences, AiError, AiProvider};
 use crate::models::provider::AiModelInfo;
 use crate::models::review::{AiReviewSummary, ReviewPrompt};
 use async_trait::async_trait;
@@ -124,23 +124,6 @@ impl AiProvider for OllamaProvider {
     }
 }
 
-/// Strip markdown code fences if the response is wrapped in them.
-fn strip_markdown_fences(s: &str) -> &str {
-    let trimmed = s.trim();
-    let without_prefix = if let Some(rest) = trimmed.strip_prefix("```json") {
-        rest
-    } else if let Some(rest) = trimmed.strip_prefix("```") {
-        rest
-    } else {
-        return trimmed;
-    };
-    let without_suffix = without_prefix
-        .trim()
-        .strip_suffix("```")
-        .unwrap_or(without_prefix.trim());
-    without_suffix.trim()
-}
-
 #[derive(Deserialize)]
 struct OllamaResponse {
     message: OllamaMessage,
@@ -187,21 +170,4 @@ mod tests {
         assert!(models.iter().any(|m| m.id.contains("qwen3")));
     }
 
-    #[test]
-    fn test_strip_markdown_fences_json() {
-        let input = "```json\n{\"key\": \"value\"}\n```";
-        assert_eq!(strip_markdown_fences(input), "{\"key\": \"value\"}");
-    }
-
-    #[test]
-    fn test_strip_markdown_fences_plain() {
-        let input = "```\n{\"key\": \"value\"}\n```";
-        assert_eq!(strip_markdown_fences(input), "{\"key\": \"value\"}");
-    }
-
-    #[test]
-    fn test_strip_markdown_fences_none() {
-        let input = "{\"key\": \"value\"}";
-        assert_eq!(strip_markdown_fences(input), "{\"key\": \"value\"}");
-    }
 }

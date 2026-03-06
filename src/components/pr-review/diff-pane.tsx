@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { parsePatch } from "@/lib/diff-parser";
@@ -29,6 +29,73 @@ interface DiffPaneProps {
   onUpdateComment: (id: string, body: string) => void;
 }
 
+// ---------------------------------------------------------------------------
+// Annotation / draft lookup maps -- built once per render of DiffPane,
+// shared with all file sections to avoid per-row .filter() calls.
+// ---------------------------------------------------------------------------
+
+type AnnotationMap = Map<string, AiAnnotation[]>;
+type DraftMap = Map<string, DraftComment[]>;
+
+function buildAnnotationMap(annotations: AiAnnotation[]): AnnotationMap {
+  const map: AnnotationMap = new Map();
+  for (const a of annotations) {
+    const existing = map.get(a.file_path);
+    if (existing) {
+      existing.push(a);
+    } else {
+      map.set(a.file_path, [a]);
+    }
+  }
+  return map;
+}
+
+function buildDraftMap(drafts: DraftComment[]): DraftMap {
+  const map: DraftMap = new Map();
+  for (const d of drafts) {
+    const existing = map.get(d.file_path);
+    if (existing) {
+      existing.push(d);
+    } else {
+      map.set(d.file_path, [d]);
+    }
+  }
+  return map;
+}
+
+// ---------------------------------------------------------------------------
+// Lazy visibility hook -- defers rendering until element is near viewport
+// ---------------------------------------------------------------------------
+
+function useLazyVisible(rootMargin = "200px"): [React.RefObject<HTMLDivElement | null>, boolean] {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [rootMargin]);
+
+  return [ref, visible];
+}
+
+// ---------------------------------------------------------------------------
+// DiffPane
+// ---------------------------------------------------------------------------
+
 export function DiffPane({
   commit,
   files,
@@ -40,8 +107,13 @@ export function DiffPane({
   onUpdateComment,
 }: DiffPaneProps) {
   const { highlighter } = useHighlighter();
-  // Use explicit files array if provided (full PR view), otherwise use commit files
   const resolvedFiles = files ?? commit?.files ?? [];
+
+  const annotationMap = useMemo(
+    () => buildAnnotationMap(aiAnnotations),
+    [aiAnnotations]
+  );
+  const draftMap = useMemo(() => buildDraftMap(draftComments), [draftComments]);
 
   if (!commit && !files) {
     return (
@@ -71,10 +143,8 @@ export function DiffPane({
           file={file}
           viewMode={viewMode}
           highlighter={highlighter}
-          annotations={aiAnnotations.filter((a) => a.file_path === file.path)}
-          draftComments={draftComments.filter(
-            (c) => c.file_path === file.path
-          )}
+          annotations={annotationMap.get(file.path) ?? EMPTY_ANNOTATIONS}
+          draftComments={draftMap.get(file.path) ?? EMPTY_DRAFTS}
           onAddComment={onAddComment}
           onRemoveComment={onRemoveComment}
           onUpdateComment={onUpdateComment}
@@ -84,48 +154,59 @@ export function DiffPane({
   );
 }
 
+// Stable empty array references to avoid re-renders
+const EMPTY_ANNOTATIONS: AiAnnotation[] = [];
+const EMPTY_DRAFTS: DraftComment[] = [];
+
 // -- Side-by-side row model --------------------------------------------------
 
 interface SplitRow {
   left: DiffLine | null;
   right: DiffLine | null;
+  leftIndex: number;
+  rightIndex: number;
 }
 
-/** Pair deletions with additions into side-by-side rows. */
 function buildSplitRows(lines: DiffLine[]): SplitRow[] {
   const rows: SplitRow[] = [];
-  let deletions: DiffLine[] = [];
-  let additions: DiffLine[] = [];
+  let deletions: { line: DiffLine; index: number }[] = [];
+  let additions: { line: DiffLine; index: number }[] = [];
 
   const flush = () => {
     const max = Math.max(deletions.length, additions.length);
     for (let i = 0; i < max; i++) {
       rows.push({
-        left: deletions[i] ?? null,
-        right: additions[i] ?? null,
+        left: deletions[i]?.line ?? null,
+        right: additions[i]?.line ?? null,
+        leftIndex: deletions[i]?.index ?? -1,
+        rightIndex: additions[i]?.index ?? -1,
       });
     }
     deletions = [];
     additions = [];
   };
 
-  for (const line of lines) {
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx];
     if (line.type === "deletion") {
-      deletions.push(line);
+      deletions.push({ line, index: idx });
     } else if (line.type === "addition") {
-      additions.push(line);
+      additions.push({ line, index: idx });
     } else {
       flush();
-      rows.push({ left: line, right: line });
+      rows.push({ left: line, right: line, leftIndex: idx, rightIndex: idx });
     }
   }
   flush();
   return rows;
 }
 
+// Large file threshold -- auto-collapse files above this line count
+const LARGE_FILE_LINES = 500;
+
 // -- FileSection -------------------------------------------------------------
 
-function FileSection({
+const FileSection = memo(function FileSection({
   file,
   viewMode,
   highlighter,
@@ -149,12 +230,25 @@ function FileSection({
   onRemoveComment: (id: string) => void;
   onUpdateComment: (id: string, body: string) => void;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
-  const parsed = parsePatch(file.patch);
-  const tokenizedHunks = useTokenizedHunks(file.path, parsed.hunks, file.patch, highlighter);
+  const parsed = useMemo(() => parsePatch(file.patch), [file.patch]);
+  const totalLines = useMemo(
+    () => parsed.hunks.reduce((sum, h) => sum + h.lines.length, 0),
+    [parsed.hunks]
+  );
+  const [collapsed, setCollapsed] = useState(totalLines > LARGE_FILE_LINES);
+  const [sentinelRef, isVisible] = useLazyVisible("400px");
+
+  // Only tokenize when visible and not collapsed
+  const shouldTokenize = isVisible && !collapsed;
+  const tokenizedHunks = useTokenizedHunks(
+    file.path,
+    parsed.hunks,
+    shouldTokenize ? file.patch : null,
+    highlighter
+  );
 
   return (
-    <div className="mb-4" data-file-path={file.path}>
+    <div className="mb-4" data-file-path={file.path} ref={sentinelRef}>
       {/* File header */}
       <button
         onClick={() => setCollapsed(!collapsed)}
@@ -166,6 +260,11 @@ function FileSection({
         <span className="flex-1 truncate font-mono text-xs font-medium">
           {file.path}
         </span>
+        {totalLines > LARGE_FILE_LINES && (
+          <span className="text-[10px] text-muted-foreground">
+            {totalLines} lines
+          </span>
+        )}
         <FileStatusBadge status={file.status} />
         <span className="text-xs text-muted-foreground">
           <span className="text-green-600 dark:text-green-400">
@@ -178,110 +277,62 @@ function FileSection({
         </span>
       </button>
 
-      {/* Diff content */}
+      {/* Diff content -- only rendered when visible and not collapsed */}
       {!collapsed && (
         <div className="overflow-x-auto rounded-b border border-t-0">
-          {parsed.hunks.length === 0 ? (
+          {!isVisible ? (
+            <div className="h-20 flex items-center justify-center">
+              <p className="text-xs text-muted-foreground">Scroll to load diff...</p>
+            </div>
+          ) : parsed.hunks.length === 0 ? (
             <p className="px-3 py-2 text-xs text-muted-foreground">
               Binary file or no patch available.
             </p>
           ) : viewMode === "split" ? (
-            <table className="w-full table-fixed border-collapse">
-              <colgroup>
-                <col style={{ width: 40 }} />
-                <col style={{ width: 'calc(50% - 40px)' }} />
-                <col style={{ width: 40 }} />
-                <col style={{ width: 'calc(50% - 40px)' }} />
-              </colgroup>
-              <tbody>
-                {parsed.hunks.map((hunk, hi) => {
-                  const splitRows = buildSplitRows(hunk.lines);
-                  const hunkTokens = tokenizedHunks?.[hi] ?? null;
-                  return splitRows.map((row, ri) => {
-                    // Map split row lines back to their index in the hunk
-                    const leftIdx = row.left ? hunk.lines.indexOf(row.left) : -1;
-                    const rightIdx = row.right ? hunk.lines.indexOf(row.right) : -1;
-                    return (
-                      <SplitDiffRow
-                        key={`${hi}-${ri}`}
-                        left={row.left}
-                        right={row.right}
-                        leftTokens={leftIdx >= 0 ? hunkTokens?.lineTokens[leftIdx] ?? null : null}
-                        rightTokens={rightIdx >= 0 ? hunkTokens?.lineTokens[rightIdx] ?? null : null}
-                        annotations={annotations}
-                        draftComments={draftComments}
-                        filePath={file.path}
-                        onAddComment={onAddComment}
-                        onRemoveComment={onRemoveComment}
-                        onUpdateComment={onUpdateComment}
-                      />
-                    );
-                  });
-                })}
-              </tbody>
-            </table>
+            <SplitDiffTable
+              parsed={parsed}
+              tokenizedHunks={tokenizedHunks}
+              annotations={annotations}
+              draftComments={draftComments}
+              filePath={file.path}
+              onAddComment={onAddComment}
+              onRemoveComment={onRemoveComment}
+              onUpdateComment={onUpdateComment}
+            />
           ) : (
-            <table className="w-full border-collapse">
-              <tbody>
-                {parsed.hunks.map((hunk, hi) =>
-                  hunk.lines.map((line, li) => {
-                    const lineAnnotations = annotations.filter(
-                      (a) =>
-                        (line.newLineNumber !== null &&
-                          line.newLineNumber >= a.start_line &&
-                          line.newLineNumber <= a.end_line) ||
-                        (line.oldLineNumber !== null &&
-                          line.oldLineNumber >= a.start_line &&
-                          line.oldLineNumber <= a.end_line)
-                    );
-
-                    const lineNumber =
-                      line.type === "deletion"
-                        ? line.oldLineNumber
-                        : line.newLineNumber;
-                    const side: "LEFT" | "RIGHT" =
-                      line.type === "deletion" ? "LEFT" : "RIGHT";
-
-                    const lineDrafts = draftComments.filter(
-                      (c) => c.line === lineNumber && c.side === side
-                    );
-
-                    const hunkTokens = tokenizedHunks?.[hi] ?? null;
-
-                    return (
-                      <UnifiedDiffRow
-                        key={`${hi}-${li}`}
-                        type={line.type}
-                        oldLineNumber={line.oldLineNumber}
-                        newLineNumber={line.newLineNumber}
-                        content={line.content}
-                        tokens={hunkTokens?.lineTokens[li] ?? null}
-                        annotations={lineAnnotations}
-                        draftComments={lineDrafts}
-                        filePath={file.path}
-                        onAddComment={onAddComment}
-                        onRemoveComment={onRemoveComment}
-                        onUpdateComment={onUpdateComment}
-                      />
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+            <UnifiedDiffTable
+              parsed={parsed}
+              tokenizedHunks={tokenizedHunks}
+              annotations={annotations}
+              draftComments={draftComments}
+              filePath={file.path}
+              onAddComment={onAddComment}
+              onRemoveComment={onRemoveComment}
+              onUpdateComment={onUpdateComment}
+            />
           )}
         </div>
       )}
     </div>
   );
+});
+
+// -- Split diff table --------------------------------------------------------
+
+import type { ParsedFileDiff } from "@/lib/diff-parser";
+import type { TokenizedHunk } from "@/components/pr-review/highlighted-code";
+
+interface SplitRowData {
+  key: string;
+  left: DiffLine | null;
+  right: DiffLine | null;
+  leftTokens: ThemedToken[] | null;
+  rightTokens: ThemedToken[] | null;
 }
 
-// -- Split (side-by-side) diff row -------------------------------------------
-
-function SplitDiffRow({
-  left,
-  right,
-  leftTokens,
-  rightTokens,
+const SplitDiffTable = memo(function SplitDiffTable({
+  parsed,
+  tokenizedHunks,
   annotations,
   draftComments,
   filePath,
@@ -289,10 +340,199 @@ function SplitDiffRow({
   onRemoveComment,
   onUpdateComment,
 }: {
-  left: DiffLine | null;
-  right: DiffLine | null;
-  leftTokens: ThemedToken[] | null;
-  rightTokens: ThemedToken[] | null;
+  parsed: ParsedFileDiff;
+  tokenizedHunks: TokenizedHunk[] | null;
+  annotations: AiAnnotation[];
+  draftComments: DraftComment[];
+  filePath: string;
+  onAddComment: (filePath: string, line: number, side: "LEFT" | "RIGHT", body: string) => void;
+  onRemoveComment: (id: string) => void;
+  onUpdateComment: (id: string, body: string) => void;
+}) {
+  const rows = useMemo<SplitRowData[]>(() => {
+    return parsed.hunks.flatMap((hunk, hi) => {
+      const splitRows = buildSplitRows(hunk.lines);
+      const hunkTokens = tokenizedHunks?.[hi] ?? null;
+      return splitRows.map((row, ri) => ({
+        key: `${hi}-${ri}`,
+        left: row.left,
+        right: row.right,
+        leftTokens: row.leftIndex >= 0 ? hunkTokens?.lineTokens[row.leftIndex] ?? null : null,
+        rightTokens: row.rightIndex >= 0 ? hunkTokens?.lineTokens[row.rightIndex] ?? null : null,
+      }));
+    });
+  }, [parsed.hunks, tokenizedHunks]);
+
+  return (
+    <div className="flex">
+      <SplitPane
+        side="LEFT"
+        rows={rows}
+        annotations={annotations}
+        draftComments={draftComments}
+        filePath={filePath}
+        onAddComment={onAddComment}
+        onRemoveComment={onRemoveComment}
+        onUpdateComment={onUpdateComment}
+        className="w-1/2 overflow-x-auto border-r"
+      />
+      <SplitPane
+        side="RIGHT"
+        rows={rows}
+        annotations={annotations}
+        draftComments={draftComments}
+        filePath={filePath}
+        onAddComment={onAddComment}
+        onRemoveComment={onRemoveComment}
+        onUpdateComment={onUpdateComment}
+        className="w-1/2 overflow-x-auto"
+      />
+    </div>
+  );
+});
+
+// -- Split pane (one side of the split view) ---------------------------------
+
+const SplitPane = memo(function SplitPane({
+  side,
+  rows,
+  annotations,
+  draftComments,
+  filePath,
+  onAddComment,
+  onRemoveComment,
+  onUpdateComment,
+  className,
+}: {
+  side: "LEFT" | "RIGHT";
+  rows: SplitRowData[];
+  annotations: AiAnnotation[];
+  draftComments: DraftComment[];
+  filePath: string;
+  onAddComment: (filePath: string, line: number, side: "LEFT" | "RIGHT", body: string) => void;
+  onRemoveComment: (id: string) => void;
+  onUpdateComment: (id: string, body: string) => void;
+  className: string;
+}) {
+  return (
+    <div className={className}>
+      <table className="min-w-full border-collapse">
+        <colgroup>
+          <col style={{ width: 40 }} />
+          <col />
+        </colgroup>
+        <tbody>
+          {rows.map((row) => (
+            <SplitPaneRow
+              key={row.key}
+              side={side}
+              line={side === "LEFT" ? row.left : row.right}
+              tokens={side === "LEFT" ? row.leftTokens : row.rightTokens}
+              otherSideLine={side === "LEFT" ? row.right : row.left}
+              annotations={annotations}
+              draftComments={draftComments}
+              filePath={filePath}
+              onAddComment={onAddComment}
+              onRemoveComment={onRemoveComment}
+              onUpdateComment={onUpdateComment}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+});
+
+// -- Unified diff table ------------------------------------------------------
+
+const UnifiedDiffTable = memo(function UnifiedDiffTable({
+  parsed,
+  tokenizedHunks,
+  annotations,
+  draftComments,
+  filePath,
+  onAddComment,
+  onRemoveComment,
+  onUpdateComment,
+}: {
+  parsed: ParsedFileDiff;
+  tokenizedHunks: TokenizedHunk[] | null;
+  annotations: AiAnnotation[];
+  draftComments: DraftComment[];
+  filePath: string;
+  onAddComment: (filePath: string, line: number, side: "LEFT" | "RIGHT", body: string) => void;
+  onRemoveComment: (id: string) => void;
+  onUpdateComment: (id: string, body: string) => void;
+}) {
+  return (
+    <table className="min-w-full border-collapse">
+      <tbody>
+        {parsed.hunks.map((hunk, hi) =>
+          hunk.lines.map((line, li) => {
+            const lineAnnotations = annotations.filter(
+              (a) =>
+                (line.newLineNumber !== null &&
+                  line.newLineNumber === a.end_line) ||
+                (line.oldLineNumber !== null &&
+                  line.type === "deletion" &&
+                  line.newLineNumber === null &&
+                  line.oldLineNumber === a.end_line)
+            );
+
+            const lineNumber =
+              line.type === "deletion"
+                ? line.oldLineNumber
+                : line.newLineNumber;
+            const side: "LEFT" | "RIGHT" =
+              line.type === "deletion" ? "LEFT" : "RIGHT";
+
+            const lineDrafts = draftComments.filter(
+              (c) => c.line === lineNumber && c.side === side
+            );
+
+            const hunkTokens = tokenizedHunks?.[hi] ?? null;
+
+            return (
+              <UnifiedDiffRow
+                key={`${hi}-${li}`}
+                type={line.type}
+                oldLineNumber={line.oldLineNumber}
+                newLineNumber={line.newLineNumber}
+                content={line.content}
+                tokens={hunkTokens?.lineTokens[li] ?? null}
+                annotations={lineAnnotations}
+                draftComments={lineDrafts}
+                filePath={filePath}
+                onAddComment={onAddComment}
+                onRemoveComment={onRemoveComment}
+                onUpdateComment={onUpdateComment}
+              />
+            );
+          })
+        )}
+      </tbody>
+    </table>
+  );
+});
+
+// -- Split pane row (one side of a single row) -------------------------------
+
+const SplitPaneRow = memo(function SplitPaneRow({
+  side,
+  line,
+  tokens,
+  otherSideLine,
+  annotations,
+  draftComments,
+  filePath,
+  onAddComment,
+  onRemoveComment,
+  onUpdateComment,
+}: {
+  side: "LEFT" | "RIGHT";
+  line: DiffLine | null;
+  tokens: ThemedToken[] | null;
+  otherSideLine: DiffLine | null;
   annotations: AiAnnotation[];
   draftComments: DraftComment[];
   filePath: string;
@@ -305,77 +545,88 @@ function SplitDiffRow({
   onRemoveComment: (id: string) => void;
   onUpdateComment: (id: string, body: string) => void;
 }) {
-  const [commentSide, setCommentSide] = useState<"LEFT" | "RIGHT" | null>(
-    null
-  );
+  const [showCommentForm, setShowCommentForm] = useState(false);
   const [commentText, setCommentText] = useState("");
 
-  const leftBg =
-    left?.type === "deletion"
-      ? "bg-red-500/10"
-      : left?.type === "context"
-        ? ""
-        : "";
-  const rightBg =
-    right?.type === "addition"
-      ? "bg-green-500/10"
-      : right?.type === "context"
-        ? ""
-        : "";
+  const lineNum = side === "LEFT"
+    ? (line?.oldLineNumber ?? null)
+    : (line?.newLineNumber ?? null);
 
-  const leftLineNum = left?.oldLineNumber ?? null;
-  const rightLineNum = right?.newLineNumber ?? null;
+  const otherLineNum = side === "LEFT"
+    ? (otherSideLine?.newLineNumber ?? null)
+    : (otherSideLine?.oldLineNumber ?? null);
 
-  // Annotations for left side (old lines)
-  const leftAnnotations = leftLineNum
-    ? annotations.filter(
-        (a) => leftLineNum >= a.start_line && leftLineNum <= a.end_line
-      )
-    : [];
+  const isAddition = line?.type === "addition";
+  const isDeletion = line?.type === "deletion";
+  const bg = isDeletion ? "bg-red-500/10" : isAddition ? "bg-green-500/10" : "";
+  const stickyBg = isDeletion
+    ? "bg-red-50 dark:bg-red-950"
+    : isAddition
+      ? "bg-green-50 dark:bg-green-950"
+      : "bg-background";
 
-  // Annotations for right side (new lines)
-  const rightAnnotations = rightLineNum
-    ? annotations.filter(
-        (a) => rightLineNum >= a.start_line && rightLineNum <= a.end_line
-      )
-    : [];
+  const myAnnotations = useMemo(
+    () =>
+      lineNum
+        ? annotations.filter((a) => lineNum === a.end_line)
+        : EMPTY_ANNOTATIONS,
+    [lineNum, annotations]
+  );
 
-  const leftDrafts = leftLineNum
-    ? draftComments.filter((c) => c.line === leftLineNum && c.side === "LEFT")
-    : [];
-  const rightDrafts = rightLineNum
-    ? draftComments.filter(
-        (c) => c.line === rightLineNum && c.side === "RIGHT"
-      )
-    : [];
+  // Check if other side has annotations (to render matching empty row)
+  const otherHasAnnotations = useMemo(() => {
+    if (!otherLineNum) return false;
+    return annotations.some((a) => otherLineNum === a.end_line);
+  }, [otherLineNum, annotations]);
 
-  const handleSubmitComment = () => {
-    if (!commentText.trim() || !commentSide) return;
-    const lineNum =
-      commentSide === "LEFT" ? leftLineNum : rightLineNum;
-    if (lineNum === null) return;
-    onAddComment(filePath, lineNum, commentSide, commentText.trim());
-    setCommentText("");
-    setCommentSide(null);
-  };
+  const myDrafts = useMemo(
+    () =>
+      lineNum
+        ? draftComments.filter((c) => c.line === lineNum && c.side === side)
+        : EMPTY_DRAFTS,
+    [lineNum, side, draftComments]
+  );
+
+  const otherHasDrafts = useMemo(() => {
+    if (!otherLineNum) return false;
+    const otherSide = side === "LEFT" ? "RIGHT" : "LEFT";
+    return draftComments.some((c) => c.line === otherLineNum && c.side === otherSide);
+  }, [otherLineNum, side, draftComments]);
 
   const hasAnnotationsBelow =
-    leftAnnotations.length > 0 ||
-    rightAnnotations.length > 0 ||
-    leftDrafts.length > 0 ||
-    rightDrafts.length > 0;
+    myAnnotations.length > 0 ||
+    myDrafts.length > 0 ||
+    otherHasAnnotations ||
+    otherHasDrafts;
+
+  const handleSubmitComment = useCallback(() => {
+    if (!commentText.trim() || lineNum === null) return;
+    onAddComment(filePath, lineNum, side, commentText.trim());
+    setCommentText("");
+    setShowCommentForm(false);
+  }, [commentText, lineNum, side, filePath, onAddComment]);
+
+  const colorClass =
+    !tokens
+      ? isDeletion
+        ? "text-red-700 dark:text-red-400"
+        : isAddition
+          ? "text-green-700 dark:text-green-400"
+          : ""
+      : "";
+
+  const prefix = isDeletion ? "-" : isAddition ? "+" : " ";
 
   return (
     <>
       <tr className="group/row">
-        {/* Left side: old */}
         <td
-          className={`relative w-10 select-none border-r px-1.5 text-right font-mono text-xs text-muted-foreground ${leftBg}`}
+          className={`sticky left-0 z-10 w-10 select-none border-r px-1.5 text-right font-mono text-xs text-muted-foreground ${stickyBg}`}
         >
-          {leftLineNum ?? ""}
-          {left && leftLineNum !== null && (
+          {lineNum ?? ""}
+          {line && lineNum !== null && (
             <button
-              onClick={() => setCommentSide("LEFT")}
+              onClick={() => setShowCommentForm(true)}
               className="absolute left-0 top-1/2 -translate-y-1/2 rounded px-0.5 text-blue-500 opacity-0 transition-opacity hover:bg-blue-100 dark:hover:bg-blue-900 group-hover/row:opacity-100"
               title="Add comment"
             >
@@ -383,105 +634,33 @@ function SplitDiffRow({
             </button>
           )}
         </td>
-        <td
-          className={`overflow-hidden border-r font-mono text-xs ${leftBg}`}
-        >
-          <div className="overflow-x-auto whitespace-pre pl-1">
-            {left && (
-              <span
-                className={
-                  left.type === "deletion" && !leftTokens
-                    ? "text-red-700 dark:text-red-400"
-                    : ""
-                }
-              >
-                {left.type === "deletion" ? "-" : " "}
-                <TokenizedLine tokens={leftTokens} fallback={left.content} />
-              </span>
-            )}
-          </div>
-        </td>
-
-        {/* Right side: new */}
-        <td
-          className={`relative w-10 select-none border-r px-1.5 text-right font-mono text-xs text-muted-foreground ${rightBg}`}
-        >
-          {rightLineNum ?? ""}
-          {right && rightLineNum !== null && (
-            <button
-              onClick={() => setCommentSide("RIGHT")}
-              className="absolute left-0 top-1/2 -translate-y-1/2 rounded px-0.5 text-blue-500 opacity-0 transition-opacity hover:bg-blue-100 dark:hover:bg-blue-900 group-hover/row:opacity-100"
-              title="Add comment"
-            >
-              +
-            </button>
+        <td className={`whitespace-pre pl-1 font-mono text-xs ${bg}`}>
+          {line && (
+            <span className={colorClass}>
+              {prefix}
+              <TokenizedLine tokens={tokens} fallback={line.content} />
+            </span>
           )}
-        </td>
-        <td
-          className={`overflow-hidden font-mono text-xs ${rightBg}`}
-        >
-          <div className="overflow-x-auto whitespace-pre pl-1">
-            {right && (
-              <span
-                className={
-                  right.type === "addition" && !rightTokens
-                    ? "text-green-700 dark:text-green-400"
-                    : ""
-                }
-              >
-                {right.type === "addition" ? "+" : " "}
-                <TokenizedLine tokens={rightTokens} fallback={right.content} />
-              </span>
-            )}
-          </div>
         </td>
       </tr>
 
-      {/* Annotations / drafts below the row */}
+      {/* Annotations / drafts -- render row on both sides to keep alignment */}
       {hasAnnotationsBelow && (
         <tr>
-          {/* Left annotations */}
-          <td
-            colSpan={2}
-            className="border-r align-top"
-          >
-            {leftAnnotations.map((ann, i) => (
-              <div
-                key={`lann-${i}`}
-                className="border-l-2 border-yellow-500 bg-yellow-500/10 px-3 py-1.5"
-              >
-                <div className="flex items-start gap-2">
-                  <SeverityBadge severity={ann.severity} />
-                  <div className="text-xs">
-                    <p>{ann.message}</p>
-                    {ann.suggestion && (
-                      <pre className="mt-1 rounded bg-muted p-1.5 font-mono text-xs">
-                        {ann.suggestion}
-                      </pre>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-            {leftDrafts.map((draft) => (
-              <DraftCommentBlock
-                key={draft.id}
-                draft={draft}
-                onRemove={onRemoveComment}
-                onUpdate={onUpdateComment}
-              />
-            ))}
-          </td>
-          {/* Right annotations */}
           <td colSpan={2} className="align-top">
-            {rightAnnotations.map((ann, i) => (
+            {myAnnotations.map((ann, i) => (
               <div
-                key={`rann-${i}`}
+                key={`ann-${i}`}
                 className="border-l-2 border-yellow-500 bg-yellow-500/10 px-3 py-1.5"
               >
                 <div className="flex items-start gap-2">
                   <SeverityBadge severity={ann.severity} />
                   <div className="text-xs">
+                    {ann.start_line !== ann.end_line && (
+                      <span className="text-[10px] text-muted-foreground">
+                        Lines {ann.start_line}--{ann.end_line}
+                      </span>
+                    )}
                     <p>{ann.message}</p>
                     {ann.suggestion && (
                       <pre className="mt-1 rounded bg-muted p-1.5 font-mono text-xs">
@@ -492,7 +671,7 @@ function SplitDiffRow({
                 </div>
               </div>
             ))}
-            {rightDrafts.map((draft) => (
+            {myDrafts.map((draft) => (
               <DraftCommentBlock
                 key={draft.id}
                 draft={draft}
@@ -505,12 +684,11 @@ function SplitDiffRow({
       )}
 
       {/* Inline comment form */}
-      {commentSide !== null && (
+      {showCommentForm && (
         <tr>
-          <td colSpan={4} className="border-l-2 border-blue-500 bg-blue-500/5 px-4 py-2">
+          <td colSpan={2} className="border-l-2 border-blue-500 bg-blue-500/5 px-4 py-2">
             <p className="mb-1 text-[10px] text-muted-foreground">
-              Comment on {commentSide === "LEFT" ? "old" : "new"} line{" "}
-              {commentSide === "LEFT" ? leftLineNum : rightLineNum}
+              Comment on {side === "LEFT" ? "old" : "new"} line {lineNum}
             </p>
             <textarea
               autoFocus
@@ -524,7 +702,7 @@ function SplitDiffRow({
                   handleSubmitComment();
                 }
                 if (e.key === "Escape") {
-                  setCommentSide(null);
+                  setShowCommentForm(false);
                   setCommentText("");
                 }
               }}
@@ -542,7 +720,7 @@ function SplitDiffRow({
                 size="sm"
                 variant="ghost"
                 onClick={() => {
-                  setCommentSide(null);
+                  setShowCommentForm(false);
                   setCommentText("");
                 }}
               >
@@ -557,11 +735,11 @@ function SplitDiffRow({
       )}
     </>
   );
-}
+});
 
-// -- Unified diff row (existing) ---------------------------------------------
+// -- Unified diff row --------------------------------------------------------
 
-function UnifiedDiffRow({
+const UnifiedDiffRow = memo(function UnifiedDiffRow({
   type,
   oldLineNumber,
   newLineNumber,
@@ -601,6 +779,13 @@ function UnifiedDiffRow({
         ? "bg-red-500/10"
         : "";
 
+  const stickyBg =
+    type === "addition"
+      ? "bg-green-50 dark:bg-green-950"
+      : type === "deletion"
+        ? "bg-red-50 dark:bg-red-950"
+        : "bg-background";
+
   const prefix =
     type === "addition" ? "+" : type === "deletion" ? "-" : " ";
 
@@ -608,17 +793,17 @@ function UnifiedDiffRow({
     type === "deletion" ? oldLineNumber : newLineNumber;
   const side: "LEFT" | "RIGHT" = type === "deletion" ? "LEFT" : "RIGHT";
 
-  const handleSubmitComment = () => {
+  const handleSubmitComment = useCallback(() => {
     if (!commentText.trim() || lineNumber === null) return;
     onAddComment(filePath, lineNumber, side, commentText.trim());
     setCommentText("");
     setShowCommentForm(false);
-  };
+  }, [commentText, lineNumber, side, filePath, onAddComment]);
 
   return (
     <>
       <tr className={`group/row ${rowClass}`}>
-        <td className="relative w-12 select-none border-r px-2 text-right font-mono text-xs text-muted-foreground">
+        <td className={`sticky left-0 z-10 w-12 select-none border-r px-2 text-right font-mono text-xs text-muted-foreground ${stickyBg}`}>
           {oldLineNumber ?? ""}
           {type !== "addition" && oldLineNumber !== null && (
             <button
@@ -630,7 +815,7 @@ function UnifiedDiffRow({
             </button>
           )}
         </td>
-        <td className="relative w-12 select-none border-r px-2 text-right font-mono text-xs text-muted-foreground">
+        <td className={`sticky left-12 z-10 w-12 select-none border-r px-2 text-right font-mono text-xs text-muted-foreground ${stickyBg}`}>
           {newLineNumber ?? ""}
           {type !== "deletion" && newLineNumber !== null && (
             <button
@@ -668,6 +853,11 @@ function UnifiedDiffRow({
             <div className="flex items-start gap-2">
               <SeverityBadge severity={ann.severity} />
               <div className="text-xs">
+                {ann.start_line !== ann.end_line && (
+                  <span className="text-[10px] text-muted-foreground">
+                    Lines {ann.start_line}--{ann.end_line}
+                  </span>
+                )}
                 <p>{ann.message}</p>
                 {ann.suggestion && (
                   <pre className="mt-1 rounded bg-muted p-2 font-mono text-xs">
@@ -744,7 +934,7 @@ function UnifiedDiffRow({
       )}
     </>
   );
-}
+});
 
 // -- Shared components -------------------------------------------------------
 

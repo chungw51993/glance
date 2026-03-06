@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { getReposCache, updateReposCache } from "@/lib/repos-cache";
 import type { PullRequestSummary, Repo } from "@/types";
 
 interface UseGitHubReturn {
@@ -14,12 +15,18 @@ interface UseGitHubReturn {
 }
 
 export function useGitHub(): UseGitHubReturn {
-  const [repos, setRepos] = useState<Repo[]>([]);
-  const [pullRequests, setPullRequests] = useState<PullRequestSummary[]>([]);
+  const cached = getReposCache();
+
+  const [repos, setRepos] = useState<Repo[]>(cached.repos);
+  const [pullRequests, setPullRequests] = useState<PullRequestSummary[]>(cached.pullRequests);
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [loadingPRs, setLoadingPRs] = useState(false);
   const [reposError, setReposError] = useState<string | null>(null);
   const [prsError, setPrsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    updateReposCache({ repos, pullRequests });
+  }, [repos, pullRequests]);
 
   const fetchRepos = useCallback(async () => {
     setLoadingRepos(true);
