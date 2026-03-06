@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getReviewCache, updateReviewCache } from "@/lib/review-cache";
 import type {
   AiReviewSummary,
   Commit,
@@ -13,6 +14,7 @@ import type {
 export type DiffScope = "commit" | "full-pr";
 
 interface UseReviewOptions {
+  prKey: string | null;
   hideMerges: boolean;
   diffScope: DiffScope;
   onHideMergesChange: (hide: boolean) => void;
@@ -54,21 +56,41 @@ interface UseReviewReturn {
 }
 
 export function useReview(options: UseReviewOptions): UseReviewReturn {
-  const { hideMerges, diffScope, onHideMergesChange, onDiffScopeChange } = options;
+  const { prKey, hideMerges, diffScope, onHideMergesChange, onDiffScopeChange } = options;
 
-  const [pr, setPr] = useState<PullRequestDetail | null>(null);
-  const [aiReview, setAiReview] = useState<AiReviewSummary | null>(null);
-  const [linearTickets, setLinearTickets] = useState<LinearTicket[]>([]);
+  const cached = prKey ? getReviewCache(prKey) : null;
+
+  const [pr, setPr] = useState<PullRequestDetail | null>(cached?.pr ?? null);
+  const [aiReview, setAiReview] = useState<AiReviewSummary | null>(cached?.aiReview ?? null);
+  const [linearTickets, setLinearTickets] = useState<LinearTicket[]>(cached?.linearTickets ?? []);
   const [linearLoading, setLinearLoading] = useState(false);
-  const [linearError, setLinearError] = useState<string | null>(null);
-  const [selectedCommitIndex, setSelectedCommitIndex] = useState(0);
+  const [linearError, setLinearError] = useState<string | null>(cached?.linearError ?? null);
+  const [selectedCommitIndex, setSelectedCommitIndex] = useState(cached?.selectedCommitIndex ?? 0);
   const [loading, setLoading] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
-  const [mergeStatus, setMergeStatus] = useState<MergeStatus | null>(null);
-  const [prFiles, setPrFiles] = useState<FileDiff[]>([]);
+  const [mergeStatus, setMergeStatus] = useState<MergeStatus | null>(cached?.mergeStatus ?? null);
+  const [prFiles, setPrFiles] = useState<FileDiff[]>(cached?.prFiles ?? []);
   const [prFilesLoading, setPrFilesLoading] = useState(false);
+
+  const activeKeyRef = useRef<string | null>(prKey);
+  activeKeyRef.current = prKey;
+
+  // Sync state to cache whenever it changes
+  useEffect(() => {
+    if (!prKey) return;
+    updateReviewCache({
+      prKey,
+      pr,
+      aiReview,
+      linearTickets,
+      linearError,
+      mergeStatus,
+      prFiles,
+      selectedCommitIndex,
+    });
+  }, [prKey, pr, aiReview, linearTickets, linearError, mergeStatus, prFiles, selectedCommitIndex]);
 
   const visibleCommits = useMemo(() => {
     if (!pr) return [];
@@ -79,11 +101,22 @@ export function useReview(options: UseReviewOptions): UseReviewReturn {
 
   const fetchPRDetail = useCallback(
     async (owner: string, repo: string, prNumber: number) => {
+      const newKey = `${owner}/${repo}/${prNumber}`;
+      const isSamePR = newKey === activeKeyRef.current;
+      const existingCache = getReviewCache(newKey);
+
       setLoading(true);
       setError(null);
-      setAiReview(null);
-      setLinearTickets([]);
-      setSelectedCommitIndex(0);
+
+      // Only clear AI review and related state when switching to a different PR
+      if (!isSamePR || !existingCache?.pr) {
+        if (!existingCache?.aiReview) {
+          setAiReview(null);
+        }
+        setLinearTickets(existingCache?.linearTickets ?? []);
+        setSelectedCommitIndex(existingCache?.selectedCommitIndex ?? 0);
+      }
+
       try {
         const result = await invoke<PullRequestDetail>(
           "get_pull_request_detail",
@@ -107,23 +140,26 @@ export function useReview(options: UseReviewOptions): UseReviewReturn {
           .catch(() => setPrFiles([]))
           .finally(() => setPrFilesLoading(false));
 
-        // Fetch Linear tickets from PR title, body, and commit messages
-        setLinearLoading(true);
-        setLinearError(null);
-        const commitMessages = result.commits.map((c) => c.message);
-        invoke<LinearTicket[]>("fetch_linear_tickets", {
-          title: result.title,
-          body: result.body,
-          commitMessages,
-        })
-          .then(setLinearTickets)
-          .catch((err) => {
-            const msg = String(err);
-            setLinearTickets([]);
-            // Distinguish "no token" from actual errors
-            setLinearError(msg);
+        // Skip re-fetching Linear tickets if returning to same PR with cached data
+        if (isSamePR && existingCache?.linearTickets.length) {
+          setLinearTickets(existingCache.linearTickets);
+        } else {
+          setLinearLoading(true);
+          setLinearError(null);
+          const commitMessages = result.commits.map((c) => c.message);
+          invoke<LinearTicket[]>("fetch_linear_tickets", {
+            title: result.title,
+            body: result.body,
+            commitMessages,
           })
-          .finally(() => setLinearLoading(false));
+            .then(setLinearTickets)
+            .catch((err) => {
+              const msg = String(err);
+              setLinearTickets([]);
+              setLinearError(msg);
+            })
+            .finally(() => setLinearLoading(false));
+        }
       } catch (err) {
         setError(String(err));
       } finally {

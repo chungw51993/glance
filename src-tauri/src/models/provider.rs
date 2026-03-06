@@ -48,6 +48,16 @@ impl AiProviderType {
             ],
             AiProviderType::Ollama => vec![
                 AiModelInfo {
+                    id: "qwen3.5:35b-a3b".into(),
+                    name: "Qwen3.5 35B-A3B".into(),
+                    max_context_tokens: 128_000,
+                },
+                AiModelInfo {
+                    id: "qwen3.5:27b".into(),
+                    name: "Qwen3.5 27B".into(),
+                    max_context_tokens: 128_000,
+                },
+                AiModelInfo {
                     id: "qwen3:32b".into(),
                     name: "Qwen3 32B".into(),
                     max_context_tokens: 128_000,
@@ -136,7 +146,8 @@ mod tests {
     fn test_default_models_ollama() {
         let models = AiProviderType::Ollama.default_models();
         assert!(models.len() >= 2);
-        assert!(models.iter().any(|m| m.id.contains("qwen3")));
+        assert!(models.iter().any(|m| m.id.contains("qwen3.5")));
+        assert!(models.iter().any(|m| m.id.contains("qwen3:")));
     }
 
     #[test]

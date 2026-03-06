@@ -111,7 +111,7 @@ export function CommitSidebar({
           </div>
 
           {/* Commit list */}
-          <ScrollArea className="flex-1">
+          <ScrollArea className="min-h-0 flex-1">
             <div className="flex flex-col">
               {visibleCommits.map((commit, index) => {
                 const firstLine = commit.message.split("\n")[0];

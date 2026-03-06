@@ -42,7 +42,7 @@ export function LinearTicketsPanel({
         )}
       </button>
       {panelExpanded && (
-        <div className="px-4 pb-2">
+        <ScrollArea className="max-h-[40vh] px-4 pb-2">
           {error && error.startsWith("NO_TOKEN:") && (
             <p className="text-xs text-muted-foreground py-2">
               {error.replace("NO_TOKEN: ", "")}
@@ -63,7 +63,7 @@ export function LinearTicketsPanel({
           {tickets.length > 1 && (
             <TabbedTicketsView tickets={tickets} />
           )}
-        </div>
+        </ScrollArea>
       )}
     </div>
   );

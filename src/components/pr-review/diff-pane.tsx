@@ -186,7 +186,13 @@ function FileSection({
               Binary file or no patch available.
             </p>
           ) : viewMode === "split" ? (
-            <table className="w-full border-collapse table-fixed">
+            <table className="w-full table-fixed border-collapse">
+              <colgroup>
+                <col style={{ width: 40 }} />
+                <col style={{ width: 'calc(50% - 40px)' }} />
+                <col style={{ width: 40 }} />
+                <col style={{ width: 'calc(50% - 40px)' }} />
+              </colgroup>
               <tbody>
                 {parsed.hunks.map((hunk, hi) => {
                   const splitRows = buildSplitRows(hunk.lines);
@@ -378,20 +384,22 @@ function SplitDiffRow({
           )}
         </td>
         <td
-          className={`w-1/2 whitespace-pre overflow-hidden text-ellipsis border-r pl-1 font-mono text-xs ${leftBg}`}
+          className={`overflow-hidden border-r font-mono text-xs ${leftBg}`}
         >
-          {left && (
-            <span
-              className={
-                left.type === "deletion" && !leftTokens
-                  ? "text-red-700 dark:text-red-400"
-                  : ""
-              }
-            >
-              {left.type === "deletion" ? "-" : " "}
-              <TokenizedLine tokens={leftTokens} fallback={left.content} />
-            </span>
-          )}
+          <div className="overflow-x-auto whitespace-pre pl-1">
+            {left && (
+              <span
+                className={
+                  left.type === "deletion" && !leftTokens
+                    ? "text-red-700 dark:text-red-400"
+                    : ""
+                }
+              >
+                {left.type === "deletion" ? "-" : " "}
+                <TokenizedLine tokens={leftTokens} fallback={left.content} />
+              </span>
+            )}
+          </div>
         </td>
 
         {/* Right side: new */}
@@ -410,20 +418,22 @@ function SplitDiffRow({
           )}
         </td>
         <td
-          className={`w-1/2 whitespace-pre overflow-hidden text-ellipsis pl-1 font-mono text-xs ${rightBg}`}
+          className={`overflow-hidden font-mono text-xs ${rightBg}`}
         >
-          {right && (
-            <span
-              className={
-                right.type === "addition" && !rightTokens
-                  ? "text-green-700 dark:text-green-400"
-                  : ""
-              }
-            >
-              {right.type === "addition" ? "+" : " "}
-              <TokenizedLine tokens={rightTokens} fallback={right.content} />
-            </span>
-          )}
+          <div className="overflow-x-auto whitespace-pre pl-1">
+            {right && (
+              <span
+                className={
+                  right.type === "addition" && !rightTokens
+                    ? "text-green-700 dark:text-green-400"
+                    : ""
+                }
+              >
+                {right.type === "addition" ? "+" : " "}
+                <TokenizedLine tokens={rightTokens} fallback={right.content} />
+              </span>
+            )}
+          </div>
         </td>
       </tr>
 
