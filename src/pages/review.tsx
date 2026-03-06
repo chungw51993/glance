@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { getReviewCache, updateReviewCache } from "@/lib/review-cache";
 import { useReview } from "@/hooks/use-review";
 import { useReviewDraft } from "@/hooks/use-review-draft";
 import { useLayoutPreferences } from "@/hooks/use-layout-preferences";
@@ -21,7 +22,19 @@ export function ReviewPage() {
   const { owner, name, prNumber } = useParams();
   const navigate = useNavigate();
   const { prefs, update } = useLayoutPreferences();
-  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+
+  const prKey = owner && name && prNumber
+    ? `${owner}/${name}/${prNumber}`
+    : null;
+
+  const cached = prKey ? getReviewCache(prKey) : null;
+  const [aiPanelOpen, setAiPanelOpen] = useState(cached?.aiPanelOpen ?? false);
+
+  // Sync aiPanelOpen to cache
+  useEffect(() => {
+    if (!prKey) return;
+    updateReviewCache({ prKey, aiPanelOpen });
+  }, [prKey, aiPanelOpen]);
 
   const {
     pr,
@@ -49,6 +62,7 @@ export function ReviewPage() {
     visibleCommits,
     mergePR,
   } = useReview({
+    prKey,
     hideMerges: prefs.hideMerges,
     diffScope: prefs.diffScope,
     onHideMergesChange: useCallback((v: boolean) => update("hideMerges", v), [update]),
@@ -62,7 +76,7 @@ export function ReviewPage() {
     removeComment,
     submitReview,
     submitting: submittingReview,
-  } = useReviewDraft();
+  } = useReviewDraft(prKey);
 
   useEffect(() => {
     if (owner && name && prNumber) {
@@ -101,7 +115,7 @@ export function ReviewPage() {
     [owner, name, prNumber, mergePR, navigate]
   );
 
-  if (loading) {
+  if (loading && !pr) {
     return (
       <div className="flex h-full items-center justify-center">
         <p className="text-sm text-muted-foreground">
@@ -194,8 +208,8 @@ export function ReviewPage() {
           onToggleCollapsed={() => update("sidebarCollapsed", !prefs.sidebarCollapsed)}
           onSelectFullPr={() => setDiffScope("full-pr")}
         />
-        <ResizablePanelGroup orientation="horizontal" className="flex-1">
-          <ResizablePanel defaultSize={aiPanelOpen ? 65 : 100} minSize={30}>
+        <ResizablePanelGroup key={aiPanelOpen ? "with-ai" : "no-ai"} orientation="horizontal" className="flex-1">
+          <ResizablePanel defaultSize={aiPanelOpen ? 50 : 100} minSize={50}>
             <div className="flex h-full flex-col overflow-hidden">
               <div className="flex shrink-0 items-center justify-between border-b px-4 py-1.5">
                 <div className="flex items-center gap-1">
@@ -253,7 +267,7 @@ export function ReviewPage() {
           {aiPanelOpen && (
             <>
               <ResizableHandle withHandle />
-              <ResizablePanel defaultSize={35} minSize={20} maxSize={60}>
+              <ResizablePanel defaultSize={50} minSize={20}>
                 <AiSummaryPanel
                   review={aiReview}
                   onClose={() => setAiPanelOpen(false)}

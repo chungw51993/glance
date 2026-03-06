@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { getReviewCache, updateReviewCache } from "@/lib/review-cache";
 import type { DraftComment, ReviewEvent } from "@/types";
 
 interface UseReviewDraftReturn {
@@ -27,10 +28,18 @@ interface UseReviewDraftReturn {
 
 let nextId = 1;
 
-export function useReviewDraft(): UseReviewDraftReturn {
-  const [draftComments, setDraftComments] = useState<DraftComment[]>([]);
+export function useReviewDraft(prKey: string | null): UseReviewDraftReturn {
+  const cached = prKey ? getReviewCache(prKey) : null;
+
+  const [draftComments, setDraftComments] = useState<DraftComment[]>(cached?.draftComments ?? []);
   const [reviewBody, setReviewBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Sync draft comments to cache
+  useEffect(() => {
+    if (!prKey) return;
+    updateReviewCache({ prKey, draftComments });
+  }, [prKey, draftComments]);
 
   const addComment = useCallback(
     (filePath: string, line: number, side: "LEFT" | "RIGHT", body: string) => {
