@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { useGitHub } from "@/hooks/use-github";
+import { getReposCache, setLastReposPath, updateReposCache } from "@/lib/repos-cache";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,20 +29,35 @@ export function ReposPage() {
   } = useGitHub();
 
   const [hasToken, setHasToken] = useState<boolean | null>(null);
-  const [selectedRepo, setSelectedRepo] = useState<Repo | null>(null);
+  const [selectedRepo, setSelectedRepo] = useState<Repo | null>(
+    getReposCache().selectedRepo
+  );
+
+  // Register this page as the last repos-area path
+  useEffect(() => {
+    setLastReposPath("/");
+  }, []);
+
+  useEffect(() => {
+    updateReposCache({ selectedRepo });
+  }, [selectedRepo]);
 
   useEffect(() => {
     invoke<boolean>("has_github_token").then((has) => {
       setHasToken(has);
-      if (has) {
+      if (has && repos.length === 0) {
         fetchRepos();
       }
     });
-  }, [fetchRepos]);
+  }, [fetchRepos, repos.length]);
 
   function handleSelectRepo(repo: Repo) {
     setSelectedRepo(repo);
     fetchPullRequests(repo.owner, repo.name);
+  }
+
+  function handleBackToRepos() {
+    setSelectedRepo(null);
   }
 
   function formatDate(iso: string): string {
@@ -143,13 +159,24 @@ export function ReposPage() {
         ) : (
           <>
             <div className="flex items-center justify-between border-b px-6 py-3">
-              <div>
-                <h2 className="text-sm font-semibold">
-                  {selectedRepo.full_name}
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  Open pull requests
-                </p>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={handleBackToRepos}
+                  title="Back to repositories"
+                >
+                  <BackArrow className="h-4 w-4" />
+                </Button>
+                <div>
+                  <h2 className="text-sm font-semibold">
+                    {selectedRepo.full_name}
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Open pull requests
+                  </p>
+                </div>
               </div>
               <Button
                 variant="ghost"
@@ -227,5 +254,22 @@ export function ReposPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function BackArrow({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="m15 18-6-6 6-6" />
+    </svg>
   );
 }

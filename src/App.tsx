@@ -13,7 +13,6 @@ function App() {
         <Route element={<AppShell />}>
           <Route path="/" element={<ReposPage />} />
           <Route path="/assigned" element={<AssignedPage />} />
-          <Route path="/repo/:owner/:name" element={<ReposPage />} />
           <Route
             path="/review/:owner/:name/:prNumber"
             element={<ReviewPage />}

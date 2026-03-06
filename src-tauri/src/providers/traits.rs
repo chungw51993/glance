@@ -92,6 +92,25 @@ pub fn build_review_user_message(prompt: &ReviewPrompt) -> String {
     msg
 }
 
+/// Strip markdown code fences if the AI response is wrapped in them.
+/// LLMs frequently ignore "no markdown fences" instructions, so we
+/// handle it defensively at the parsing layer.
+pub fn strip_markdown_fences(s: &str) -> &str {
+    let trimmed = s.trim();
+    let without_prefix = if let Some(rest) = trimmed.strip_prefix("```json") {
+        rest
+    } else if let Some(rest) = trimmed.strip_prefix("```") {
+        rest
+    } else {
+        return trimmed;
+    };
+    let without_suffix = without_prefix
+        .trim()
+        .strip_suffix("```")
+        .unwrap_or(without_prefix.trim());
+    without_suffix.trim()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,6 +142,24 @@ mod tests {
         assert!(msg.contains("CPT-123"));
         assert!(msg.contains("src/auth.rs"));
         assert!(msg.contains("+ fn login() {}"));
+    }
+
+    #[test]
+    fn test_strip_markdown_fences_json() {
+        let input = "```json\n{\"key\": \"value\"}\n```";
+        assert_eq!(strip_markdown_fences(input), "{\"key\": \"value\"}");
+    }
+
+    #[test]
+    fn test_strip_markdown_fences_plain() {
+        let input = "```\n{\"key\": \"value\"}\n```";
+        assert_eq!(strip_markdown_fences(input), "{\"key\": \"value\"}");
+    }
+
+    #[test]
+    fn test_strip_markdown_fences_none() {
+        let input = "{\"key\": \"value\"}";
+        assert_eq!(strip_markdown_fences(input), "{\"key\": \"value\"}");
     }
 
     #[test]
