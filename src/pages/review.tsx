@@ -219,7 +219,7 @@ export function ReviewPage() {
         <ResizablePanelGroup key={aiPanelOpen ? "with-ai" : "no-ai"} orientation="horizontal" className="flex-1">
           <ResizablePanel defaultSize={aiPanelOpen ? 50 : 100} minSize={50}>
             <div className="flex h-full flex-col overflow-hidden">
-              <div className="flex shrink-0 items-center justify-between border-b px-4 py-1.5">
+              <div className="flex shrink-0 items-center justify-between border-b bg-background px-4 py-1.5">
                 <div className="flex items-center gap-1">
                   <span className="mr-2 text-xs text-muted-foreground">View:</span>
                   <Button
@@ -258,7 +258,7 @@ export function ReviewPage() {
                   )}
                 </div>
               </div>
-              <div className="flex-1 overflow-auto">
+              <div className="flex-1 overflow-auto bg-background">
                 <DiffPane
                   commit={diffScope === "commit" ? selectedCommit : null}
                   files={diffScope === "full-pr" ? prFiles : undefined}

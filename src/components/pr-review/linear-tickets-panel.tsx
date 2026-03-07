@@ -21,7 +21,7 @@ export function LinearTicketsPanel({
 }: LinearTicketsPanelProps) {
 
   return (
-    <div className="shrink-0 border-t">
+    <div className="shrink-0 border-t bg-background">
       <button
         onClick={onToggleExpanded}
         className="flex w-full items-center gap-2 px-4 py-1.5 hover:bg-accent/50 transition-colors"
@@ -75,8 +75,8 @@ export function LinearTicketsPanel({
 
 function TabbedTicketsView({ tickets }: { tickets: LinearTicket[] }) {
   return (
-    <Tabs defaultValue={tickets[0].identifier}>
-      <TabsList variant="line" className="w-full justify-start gap-0 overflow-x-auto">
+    <Tabs defaultValue={tickets[0].identifier} className="flex flex-col">
+      <TabsList variant="line" className="sticky top-0 z-10 bg-background w-full justify-start gap-0 overflow-x-auto shrink-0">
         {tickets.map((ticket) => (
           <TabsTrigger
             key={ticket.identifier}

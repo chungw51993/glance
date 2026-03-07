@@ -414,12 +414,17 @@ impl GitHubClient {
         let gh_comments: Vec<serde_json::Value> = comments
             .iter()
             .map(|c| {
-                serde_json::json!({
+                let mut obj = serde_json::json!({
                     "path": c.path,
                     "line": c.line,
                     "side": c.side,
                     "body": c.body,
-                })
+                });
+                if let Some(start) = c.start_line {
+                    obj["start_line"] = serde_json::json!(start);
+                    obj["start_side"] = serde_json::json!(c.side);
+                }
+                obj
             })
             .collect();
 

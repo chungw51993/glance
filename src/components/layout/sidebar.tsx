@@ -31,29 +31,8 @@ export function Sidebar({
       className="flex h-full shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-200 overflow-hidden"
       style={{ width: collapsed ? 48 : 224 }}
     >
-      {/* Header */}
-      <div className="flex h-14 shrink-0 items-center justify-between px-3">
-        {!collapsed && (
-          <span className="truncate font-semibold tracking-tight text-sm pl-1">
-            PR Reviewer
-          </span>
-        )}
-        <button
-          onClick={onToggleCollapsed}
-          className="shrink-0 rounded p-1.5 hover:bg-sidebar-accent"
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <ChevronLeft className="h-4 w-4" />
-          )}
-        </button>
-      </div>
-      <Separator />
-
       {/* Nav links */}
-      <NavItems collapsed={collapsed} />
+      <NavItems collapsed={collapsed} onToggleCollapsed={onToggleCollapsed} />
 
       {/* Theme toggle at bottom */}
       <Separator />
@@ -82,7 +61,7 @@ const staticNavItems = [
   { to: "/settings", label: "Settings", icon: "{}" },
 ];
 
-function NavItems({ collapsed }: { collapsed: boolean }) {
+function NavItems({ collapsed, onToggleCollapsed }: { collapsed: boolean; onToggleCollapsed: () => void }) {
   const location = useLocation();
   const reposPath = getLastReposPath();
   const isReposArea = location.pathname === "/" || location.pathname.startsWith("/review/");
@@ -98,6 +77,22 @@ function NavItems({ collapsed }: { collapsed: boolean }) {
 
   return (
     <nav className="flex flex-1 flex-col gap-1 p-2">
+      <button
+        onClick={onToggleCollapsed}
+        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        className={cn(
+          "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+          "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
+          collapsed && "justify-center px-2"
+        )}
+      >
+        {collapsed ? (
+          <ChevronRight className="h-4 w-4 shrink-0" />
+        ) : (
+          <ChevronLeft className="h-4 w-4 shrink-0" />
+        )}
+        {!collapsed && <span className="truncate">Collapse</span>}
+      </button>
       <NavLink
         to={reposPath}
         title={collapsed ? "Repos" : undefined}

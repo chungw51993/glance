@@ -11,7 +11,8 @@ interface UseReviewDraftReturn {
     filePath: string,
     line: number,
     side: "LEFT" | "RIGHT",
-    body: string
+    body: string,
+    startLine?: number
   ) => void;
   updateComment: (id: string, body: string) => void;
   removeComment: (id: string) => void;
@@ -42,13 +43,14 @@ export function useReviewDraft(prKey: string | null): UseReviewDraftReturn {
   }, [prKey, draftComments]);
 
   const addComment = useCallback(
-    (filePath: string, line: number, side: "LEFT" | "RIGHT", body: string) => {
+    (filePath: string, line: number, side: "LEFT" | "RIGHT", body: string, startLine?: number) => {
       const comment: DraftComment = {
         id: `draft-${nextId++}`,
         file_path: filePath,
         line,
         side,
         body,
+        ...(startLine != null && startLine !== line ? { start_line: startLine } : {}),
       };
       setDraftComments((prev) => [...prev, comment]);
     },
@@ -83,6 +85,7 @@ export function useReviewDraft(prKey: string | null): UseReviewDraftReturn {
         const comments = draftComments.map((c) => ({
           path: c.file_path,
           line: c.line,
+          start_line: c.start_line ?? null,
           side: c.side,
           body: c.body,
         }));

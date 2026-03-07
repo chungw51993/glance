@@ -23,10 +23,31 @@ interface DiffPaneProps {
     filePath: string,
     line: number,
     side: "LEFT" | "RIGHT",
-    body: string
+    body: string,
+    startLine?: number
   ) => void;
   onRemoveComment: (id: string) => void;
   onUpdateComment: (id: string, body: string) => void;
+}
+
+// -- Line range selection state -----------------------------------------------
+
+interface LineSelection {
+  side: "LEFT" | "RIGHT";
+  anchorLine: number;
+  currentLine: number;
+}
+
+function selectionRange(sel: LineSelection): { startLine: number; endLine: number } {
+  const a = sel.anchorLine;
+  const b = sel.currentLine;
+  return { startLine: Math.min(a, b), endLine: Math.max(a, b) };
+}
+
+function isLineInSelection(lineNum: number | null, side: "LEFT" | "RIGHT", sel: LineSelection | null): boolean {
+  if (!sel || lineNum === null || sel.side !== side) return false;
+  const { startLine, endLine } = selectionRange(sel);
+  return lineNum >= startLine && lineNum <= endLine;
 }
 
 // ---------------------------------------------------------------------------
@@ -225,7 +246,8 @@ const FileSection = memo(function FileSection({
     filePath: string,
     line: number,
     side: "LEFT" | "RIGHT",
-    body: string
+    body: string,
+    startLine?: number
   ) => void;
   onRemoveComment: (id: string) => void;
   onUpdateComment: (id: string, body: string) => void;
@@ -345,7 +367,7 @@ const SplitDiffTable = memo(function SplitDiffTable({
   annotations: AiAnnotation[];
   draftComments: DraftComment[];
   filePath: string;
-  onAddComment: (filePath: string, line: number, side: "LEFT" | "RIGHT", body: string) => void;
+  onAddComment: (filePath: string, line: number, side: "LEFT" | "RIGHT", body: string, startLine?: number) => void;
   onRemoveComment: (id: string) => void;
   onUpdateComment: (id: string, body: string) => void;
 }) {
@@ -409,34 +431,106 @@ const SplitPane = memo(function SplitPane({
   annotations: AiAnnotation[];
   draftComments: DraftComment[];
   filePath: string;
-  onAddComment: (filePath: string, line: number, side: "LEFT" | "RIGHT", body: string) => void;
+  onAddComment: (filePath: string, line: number, side: "LEFT" | "RIGHT", body: string, startLine?: number) => void;
   onRemoveComment: (id: string) => void;
   onUpdateComment: (id: string, body: string) => void;
   className: string;
 }) {
+  const [selection, setSelection] = useState<LineSelection | null>(null);
+  const [commentForm, setCommentForm] = useState<{ startLine: number; endLine: number; side: "LEFT" | "RIGHT" } | null>(null);
+  const [commentText, setCommentText] = useState("");
+  const draggingRef = useRef(false);
+
+  useEffect(() => {
+    const handleMouseUp = () => {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      setSelection((sel) => {
+        if (!sel) return null;
+        const { startLine, endLine } = selectionRange(sel);
+        setCommentForm({ startLine, endLine, side: sel.side });
+        return null;
+      });
+    };
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => window.removeEventListener("mouseup", handleMouseUp);
+  }, []);
+
+  const handleLineMouseDown = useCallback((lineNum: number) => {
+    draggingRef.current = true;
+    setSelection({ side, anchorLine: lineNum, currentLine: lineNum });
+    setCommentForm(null);
+  }, [side]);
+
+  const handleLineMouseEnter = useCallback((lineNum: number) => {
+    if (!draggingRef.current) return;
+    setSelection((prev) => {
+      if (!prev) return prev;
+      return { ...prev, currentLine: lineNum };
+    });
+  }, []);
+
+  const handleSubmitComment = useCallback(() => {
+    if (!commentText.trim() || !commentForm) return;
+    const { startLine, endLine } = commentForm;
+    onAddComment(filePath, endLine, side, commentText.trim(), startLine !== endLine ? startLine : undefined);
+    setCommentText("");
+    setCommentForm(null);
+  }, [commentText, commentForm, filePath, side, onAddComment]);
+
+  const handleCancelComment = useCallback(() => {
+    setCommentForm(null);
+    setCommentText("");
+  }, []);
+
   return (
     <div className={className}>
-      <table className="min-w-full border-collapse">
+      <table className="min-w-full border-collapse select-none">
         <colgroup>
           <col style={{ width: 40 }} />
           <col />
         </colgroup>
         <tbody>
-          {rows.map((row) => (
-            <SplitPaneRow
-              key={row.key}
-              side={side}
-              line={side === "LEFT" ? row.left : row.right}
-              tokens={side === "LEFT" ? row.leftTokens : row.rightTokens}
-              otherSideLine={side === "LEFT" ? row.right : row.left}
-              annotations={annotations}
-              draftComments={draftComments}
-              filePath={filePath}
-              onAddComment={onAddComment}
-              onRemoveComment={onRemoveComment}
-              onUpdateComment={onUpdateComment}
-            />
-          ))}
+          {rows.map((row) => {
+            const line = side === "LEFT" ? row.left : row.right;
+            const lineNum = side === "LEFT"
+              ? (line?.oldLineNumber ?? null)
+              : (line?.newLineNumber ?? null);
+            const isInDragSelection = isLineInSelection(lineNum, side, selection);
+            const isInFormRange =
+              commentForm &&
+              commentForm.side === side &&
+              lineNum !== null &&
+              lineNum >= commentForm.startLine &&
+              lineNum <= commentForm.endLine;
+            const isSelected = isInDragSelection || !!isInFormRange;
+            const showFormAfterThisLine =
+              commentForm &&
+              commentForm.side === side &&
+              commentForm.endLine === lineNum;
+
+            return (
+              <SplitPaneRow
+                key={row.key}
+                side={side}
+                line={line}
+                tokens={side === "LEFT" ? row.leftTokens : row.rightTokens}
+                otherSideLine={side === "LEFT" ? row.right : row.left}
+                annotations={annotations}
+                draftComments={draftComments}
+                isSelected={isSelected}
+                commentForm={showFormAfterThisLine ? commentForm : null}
+                commentText={commentText}
+                onCommentTextChange={setCommentText}
+                onSubmitComment={handleSubmitComment}
+                onCancelComment={handleCancelComment}
+                onLineMouseDown={handleLineMouseDown}
+                onLineMouseEnter={handleLineMouseEnter}
+                onRemoveComment={onRemoveComment}
+                onUpdateComment={onUpdateComment}
+              />
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -460,12 +554,60 @@ const UnifiedDiffTable = memo(function UnifiedDiffTable({
   annotations: AiAnnotation[];
   draftComments: DraftComment[];
   filePath: string;
-  onAddComment: (filePath: string, line: number, side: "LEFT" | "RIGHT", body: string) => void;
+  onAddComment: (filePath: string, line: number, side: "LEFT" | "RIGHT", body: string, startLine?: number) => void;
   onRemoveComment: (id: string) => void;
   onUpdateComment: (id: string, body: string) => void;
 }) {
+  const [selection, setSelection] = useState<LineSelection | null>(null);
+  const [commentForm, setCommentForm] = useState<{ startLine: number; endLine: number; side: "LEFT" | "RIGHT" } | null>(null);
+  const [commentText, setCommentText] = useState("");
+  const draggingRef = useRef(false);
+
+  // Global mouseup to finalize selection
+  useEffect(() => {
+    const handleMouseUp = () => {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      setSelection((sel) => {
+        if (!sel) return null;
+        const { startLine, endLine } = selectionRange(sel);
+        setCommentForm({ startLine, endLine, side: sel.side });
+        return null;
+      });
+    };
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => window.removeEventListener("mouseup", handleMouseUp);
+  }, []);
+
+  const handleLineMouseDown = useCallback((lineNum: number, side: "LEFT" | "RIGHT") => {
+    draggingRef.current = true;
+    setSelection({ side, anchorLine: lineNum, currentLine: lineNum });
+    setCommentForm(null);
+  }, []);
+
+  const handleLineMouseEnter = useCallback((lineNum: number, side: "LEFT" | "RIGHT") => {
+    if (!draggingRef.current) return;
+    setSelection((prev) => {
+      if (!prev || prev.side !== side) return prev;
+      return { ...prev, currentLine: lineNum };
+    });
+  }, []);
+
+  const handleSubmitComment = useCallback(() => {
+    if (!commentText.trim() || !commentForm) return;
+    const { startLine, endLine, side } = commentForm;
+    onAddComment(filePath, endLine, side, commentText.trim(), startLine !== endLine ? startLine : undefined);
+    setCommentText("");
+    setCommentForm(null);
+  }, [commentText, commentForm, filePath, onAddComment]);
+
+  const handleCancelComment = useCallback(() => {
+    setCommentForm(null);
+    setCommentText("");
+  }, []);
+
   return (
-    <table className="min-w-full border-collapse">
+    <table className="min-w-full border-collapse select-none">
       <tbody>
         {parsed.hunks.map((hunk, hi) =>
           hunk.lines.map((line, li) => {
@@ -491,6 +633,18 @@ const UnifiedDiffTable = memo(function UnifiedDiffTable({
             );
 
             const hunkTokens = tokenizedHunks?.[hi] ?? null;
+            const isInDragSelection = isLineInSelection(lineNumber, side, selection);
+            const isInFormRange =
+              commentForm &&
+              commentForm.side === side &&
+              lineNumber !== null &&
+              lineNumber >= commentForm.startLine &&
+              lineNumber <= commentForm.endLine;
+            const isSelected = isInDragSelection || !!isInFormRange;
+            const showFormAfterThisLine =
+              commentForm &&
+              commentForm.side === side &&
+              commentForm.endLine === lineNumber;
 
             return (
               <UnifiedDiffRow
@@ -502,8 +656,14 @@ const UnifiedDiffTable = memo(function UnifiedDiffTable({
                 tokens={hunkTokens?.lineTokens[li] ?? null}
                 annotations={lineAnnotations}
                 draftComments={lineDrafts}
-                filePath={filePath}
-                onAddComment={onAddComment}
+                isSelected={isSelected}
+                commentForm={showFormAfterThisLine ? commentForm : null}
+                commentText={commentText}
+                onCommentTextChange={setCommentText}
+                onSubmitComment={handleSubmitComment}
+                onCancelComment={handleCancelComment}
+                onLineMouseDown={handleLineMouseDown}
+                onLineMouseEnter={handleLineMouseEnter}
                 onRemoveComment={onRemoveComment}
                 onUpdateComment={onUpdateComment}
               />
@@ -524,8 +684,14 @@ const SplitPaneRow = memo(function SplitPaneRow({
   otherSideLine,
   annotations,
   draftComments,
-  filePath,
-  onAddComment,
+  isSelected,
+  commentForm,
+  commentText,
+  onCommentTextChange,
+  onSubmitComment,
+  onCancelComment,
+  onLineMouseDown,
+  onLineMouseEnter,
   onRemoveComment,
   onUpdateComment,
 }: {
@@ -535,19 +701,17 @@ const SplitPaneRow = memo(function SplitPaneRow({
   otherSideLine: DiffLine | null;
   annotations: AiAnnotation[];
   draftComments: DraftComment[];
-  filePath: string;
-  onAddComment: (
-    filePath: string,
-    line: number,
-    side: "LEFT" | "RIGHT",
-    body: string
-  ) => void;
+  isSelected: boolean;
+  commentForm: { startLine: number; endLine: number; side: "LEFT" | "RIGHT" } | null;
+  commentText: string;
+  onCommentTextChange: (text: string) => void;
+  onSubmitComment: () => void;
+  onCancelComment: () => void;
+  onLineMouseDown: (lineNum: number) => void;
+  onLineMouseEnter: (lineNum: number) => void;
   onRemoveComment: (id: string) => void;
   onUpdateComment: (id: string, body: string) => void;
 }) {
-  const [showCommentForm, setShowCommentForm] = useState(false);
-  const [commentText, setCommentText] = useState("");
-
   const lineNum = side === "LEFT"
     ? (line?.oldLineNumber ?? null)
     : (line?.newLineNumber ?? null);
@@ -558,12 +722,16 @@ const SplitPaneRow = memo(function SplitPaneRow({
 
   const isAddition = line?.type === "addition";
   const isDeletion = line?.type === "deletion";
-  const bg = isDeletion ? "bg-red-500/10" : isAddition ? "bg-green-500/10" : "";
-  const stickyBg = isDeletion
-    ? "bg-red-50 dark:bg-red-950"
-    : isAddition
-      ? "bg-green-50 dark:bg-green-950"
-      : "bg-background";
+  const bg = isSelected
+    ? "bg-blue-500/20 ring-1 ring-inset ring-blue-400/30"
+    : isDeletion ? "bg-red-500/10" : isAddition ? "bg-green-500/10" : "";
+  const stickyBg = isSelected
+    ? "bg-blue-100 dark:bg-blue-950"
+    : isDeletion
+      ? "bg-red-50 dark:bg-red-950"
+      : isAddition
+        ? "bg-green-50 dark:bg-green-950"
+        : "bg-background";
 
   const myAnnotations = useMemo(
     () =>
@@ -573,7 +741,6 @@ const SplitPaneRow = memo(function SplitPaneRow({
     [lineNum, annotations]
   );
 
-  // Check if other side has annotations (to render matching empty row)
   const otherHasAnnotations = useMemo(() => {
     if (!otherLineNum) return false;
     return annotations.some((a) => otherLineNum === a.end_line);
@@ -599,13 +766,6 @@ const SplitPaneRow = memo(function SplitPaneRow({
     otherHasAnnotations ||
     otherHasDrafts;
 
-  const handleSubmitComment = useCallback(() => {
-    if (!commentText.trim() || lineNum === null) return;
-    onAddComment(filePath, lineNum, side, commentText.trim());
-    setCommentText("");
-    setShowCommentForm(false);
-  }, [commentText, lineNum, side, filePath, onAddComment]);
-
   const colorClass =
     !tokens
       ? isDeletion
@@ -617,22 +777,30 @@ const SplitPaneRow = memo(function SplitPaneRow({
 
   const prefix = isDeletion ? "-" : isAddition ? "+" : " ";
 
+  const formLabel = commentForm
+    ? commentForm.startLine === commentForm.endLine
+      ? `Comment on ${side === "LEFT" ? "old" : "new"} line ${commentForm.endLine}`
+      : `Comment on ${side === "LEFT" ? "old" : "new"} lines ${commentForm.startLine}-${commentForm.endLine}`
+    : "";
+
   return (
     <>
       <tr className="group/row">
         <td
-          className={`sticky left-0 z-10 w-10 select-none border-r px-1.5 text-right font-mono text-xs text-muted-foreground ${stickyBg}`}
+          className={`sticky left-0 z-10 w-10 cursor-pointer border-r px-1.5 text-right font-mono text-xs text-muted-foreground ${stickyBg}`}
+          onMouseDown={(e) => {
+            if (line && lineNum !== null) {
+              e.preventDefault();
+              onLineMouseDown(lineNum);
+            }
+          }}
+          onMouseEnter={() => {
+            if (line && lineNum !== null) {
+              onLineMouseEnter(lineNum);
+            }
+          }}
         >
           {lineNum ?? ""}
-          {line && lineNum !== null && (
-            <button
-              onClick={() => setShowCommentForm(true)}
-              className="absolute left-0 top-1/2 -translate-y-1/2 rounded px-0.5 text-blue-500 opacity-0 transition-opacity hover:bg-blue-100 dark:hover:bg-blue-900 group-hover/row:opacity-100"
-              title="Add comment"
-            >
-              +
-            </button>
-          )}
         </td>
         <td className={`whitespace-pre pl-1 font-mono text-xs ${bg}`}>
           {line && (
@@ -644,7 +812,6 @@ const SplitPaneRow = memo(function SplitPaneRow({
         </td>
       </tr>
 
-      {/* Annotations / drafts -- render row on both sides to keep alignment */}
       {hasAnnotationsBelow && (
         <tr>
           <td colSpan={2} className="align-top">
@@ -683,27 +850,25 @@ const SplitPaneRow = memo(function SplitPaneRow({
         </tr>
       )}
 
-      {/* Inline comment form */}
-      {showCommentForm && (
+      {commentForm && (
         <tr>
           <td colSpan={2} className="border-l-2 border-blue-500 bg-blue-500/5 px-4 py-2">
             <p className="mb-1 text-[10px] text-muted-foreground">
-              Comment on {side === "LEFT" ? "old" : "new"} line {lineNum}
+              {formLabel}
             </p>
             <textarea
               autoFocus
-              className="w-full rounded border bg-background px-2 py-1 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full rounded border bg-background px-2 py-1 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-ring select-text"
               rows={3}
               placeholder="Leave a comment..."
               value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
+              onChange={(e) => onCommentTextChange(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  handleSubmitComment();
+                  onSubmitComment();
                 }
                 if (e.key === "Escape") {
-                  setShowCommentForm(false);
-                  setCommentText("");
+                  onCancelComment();
                 }
               }}
             />
@@ -711,7 +876,7 @@ const SplitPaneRow = memo(function SplitPaneRow({
               <Button
                 size="sm"
                 variant="default"
-                onClick={handleSubmitComment}
+                onClick={onSubmitComment}
                 disabled={!commentText.trim()}
               >
                 Add to review
@@ -719,10 +884,7 @@ const SplitPaneRow = memo(function SplitPaneRow({
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => {
-                  setShowCommentForm(false);
-                  setCommentText("");
-                }}
+                onClick={onCancelComment}
               >
                 Cancel
               </Button>
@@ -747,8 +909,14 @@ const UnifiedDiffRow = memo(function UnifiedDiffRow({
   tokens,
   annotations,
   draftComments,
-  filePath,
-  onAddComment,
+  isSelected,
+  commentForm,
+  commentText,
+  onCommentTextChange,
+  onSubmitComment,
+  onCancelComment,
+  onLineMouseDown,
+  onLineMouseEnter,
   onRemoveComment,
   onUpdateComment,
 }: {
@@ -759,73 +927,78 @@ const UnifiedDiffRow = memo(function UnifiedDiffRow({
   tokens: ThemedToken[] | null;
   annotations: AiAnnotation[];
   draftComments: DraftComment[];
-  filePath: string;
-  onAddComment: (
-    filePath: string,
-    line: number,
-    side: "LEFT" | "RIGHT",
-    body: string
-  ) => void;
+  isSelected: boolean;
+  commentForm: { startLine: number; endLine: number; side: "LEFT" | "RIGHT" } | null;
+  commentText: string;
+  onCommentTextChange: (text: string) => void;
+  onSubmitComment: () => void;
+  onCancelComment: () => void;
+  onLineMouseDown: (lineNum: number, side: "LEFT" | "RIGHT") => void;
+  onLineMouseEnter: (lineNum: number, side: "LEFT" | "RIGHT") => void;
   onRemoveComment: (id: string) => void;
   onUpdateComment: (id: string, body: string) => void;
 }) {
-  const [showCommentForm, setShowCommentForm] = useState(false);
-  const [commentText, setCommentText] = useState("");
-
   const rowClass =
-    type === "addition"
-      ? "bg-green-500/10"
-      : type === "deletion"
-        ? "bg-red-500/10"
-        : "";
+    isSelected
+      ? "bg-blue-500/20 ring-1 ring-inset ring-blue-400/30"
+      : type === "addition"
+        ? "bg-green-500/10"
+        : type === "deletion"
+          ? "bg-red-500/10"
+          : "";
 
   const stickyBg =
-    type === "addition"
-      ? "bg-green-50 dark:bg-green-950"
-      : type === "deletion"
-        ? "bg-red-50 dark:bg-red-950"
-        : "bg-background";
+    isSelected
+      ? "bg-blue-100 dark:bg-blue-950"
+      : type === "addition"
+        ? "bg-green-50 dark:bg-green-950"
+        : type === "deletion"
+          ? "bg-red-50 dark:bg-red-950"
+          : "bg-background";
 
   const prefix =
     type === "addition" ? "+" : type === "deletion" ? "-" : " ";
 
-  const lineNumber =
-    type === "deletion" ? oldLineNumber : newLineNumber;
-  const side: "LEFT" | "RIGHT" = type === "deletion" ? "LEFT" : "RIGHT";
-
-  const handleSubmitComment = useCallback(() => {
-    if (!commentText.trim() || lineNumber === null) return;
-    onAddComment(filePath, lineNumber, side, commentText.trim());
-    setCommentText("");
-    setShowCommentForm(false);
-  }, [commentText, lineNumber, side, filePath, onAddComment]);
+  const formLabel = commentForm
+    ? commentForm.startLine === commentForm.endLine
+      ? `Comment on ${commentForm.side === "LEFT" ? "old" : "new"} line ${commentForm.endLine}`
+      : `Comment on ${commentForm.side === "LEFT" ? "old" : "new"} lines ${commentForm.startLine}-${commentForm.endLine}`
+    : "";
 
   return (
     <>
       <tr className={`group/row ${rowClass}`}>
-        <td className={`sticky left-0 z-10 w-12 select-none border-r px-2 text-right font-mono text-xs text-muted-foreground ${stickyBg}`}>
+        <td
+          className={`sticky left-0 z-10 w-12 cursor-pointer border-r px-2 text-right font-mono text-xs text-muted-foreground ${stickyBg}`}
+          onMouseDown={(e) => {
+            if (type !== "addition" && oldLineNumber !== null) {
+              e.preventDefault();
+              onLineMouseDown(oldLineNumber, "LEFT");
+            }
+          }}
+          onMouseEnter={() => {
+            if (type !== "addition" && oldLineNumber !== null) {
+              onLineMouseEnter(oldLineNumber, "LEFT");
+            }
+          }}
+        >
           {oldLineNumber ?? ""}
-          {type !== "addition" && oldLineNumber !== null && (
-            <button
-              onClick={() => setShowCommentForm(true)}
-              className="absolute left-0 top-1/2 -translate-y-1/2 rounded px-0.5 text-blue-500 opacity-0 transition-opacity hover:bg-blue-100 dark:hover:bg-blue-900 group-hover/row:opacity-100"
-              title="Add comment"
-            >
-              +
-            </button>
-          )}
         </td>
-        <td className={`sticky left-12 z-10 w-12 select-none border-r px-2 text-right font-mono text-xs text-muted-foreground ${stickyBg}`}>
+        <td
+          className={`sticky left-12 z-10 w-12 cursor-pointer border-r px-2 text-right font-mono text-xs text-muted-foreground ${stickyBg}`}
+          onMouseDown={(e) => {
+            if (type !== "deletion" && newLineNumber !== null) {
+              e.preventDefault();
+              onLineMouseDown(newLineNumber, "RIGHT");
+            }
+          }}
+          onMouseEnter={() => {
+            if (type !== "deletion" && newLineNumber !== null) {
+              onLineMouseEnter(newLineNumber, "RIGHT");
+            }
+          }}
+        >
           {newLineNumber ?? ""}
-          {type !== "deletion" && newLineNumber !== null && (
-            <button
-              onClick={() => setShowCommentForm(true)}
-              className="absolute left-0 top-1/2 -translate-y-1/2 rounded px-0.5 text-blue-500 opacity-0 transition-opacity hover:bg-blue-100 dark:hover:bg-blue-900 group-hover/row:opacity-100"
-              title="Add comment"
-            >
-              +
-            </button>
-          )}
         </td>
         <td className="whitespace-pre pl-1 font-mono text-xs">
           <span
@@ -883,26 +1056,28 @@ const UnifiedDiffRow = memo(function UnifiedDiffRow({
           </td>
         </tr>
       ))}
-      {showCommentForm && (
+      {commentForm && (
         <tr>
           <td
             colSpan={3}
             className="border-l-2 border-blue-500 bg-blue-500/5 px-4 py-2"
           >
+            <p className="mb-1 text-[10px] text-muted-foreground">
+              {formLabel}
+            </p>
             <textarea
               autoFocus
-              className="w-full rounded border bg-background px-2 py-1 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full rounded border bg-background px-2 py-1 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-ring select-text"
               rows={3}
               placeholder="Leave a comment..."
               value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
+              onChange={(e) => onCommentTextChange(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  handleSubmitComment();
+                  onSubmitComment();
                 }
                 if (e.key === "Escape") {
-                  setShowCommentForm(false);
-                  setCommentText("");
+                  onCancelComment();
                 }
               }}
             />
@@ -910,7 +1085,7 @@ const UnifiedDiffRow = memo(function UnifiedDiffRow({
               <Button
                 size="sm"
                 variant="default"
-                onClick={handleSubmitComment}
+                onClick={onSubmitComment}
                 disabled={!commentText.trim()}
               >
                 Add to review
@@ -918,10 +1093,7 @@ const UnifiedDiffRow = memo(function UnifiedDiffRow({
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => {
-                  setShowCommentForm(false);
-                  setCommentText("");
-                }}
+                onClick={onCancelComment}
               >
                 Cancel
               </Button>
@@ -1000,9 +1172,16 @@ function DraftCommentBlock({
             <Badge variant="outline" className="shrink-0 text-[10px]">
               Pending
             </Badge>
-            <p className="whitespace-pre-wrap font-mono text-xs">
-              {draft.body}
-            </p>
+            <div>
+              {draft.start_line != null && (
+                <span className="text-[10px] text-muted-foreground block mb-0.5">
+                  Lines {draft.start_line}--{draft.line}
+                </span>
+              )}
+              <p className="whitespace-pre-wrap font-mono text-xs">
+                {draft.body}
+              </p>
+            </div>
           </div>
           <div className="flex shrink-0 gap-1">
             <Button
@@ -1092,7 +1271,14 @@ function DraftCommentInline({
         <Badge variant="outline" className="shrink-0 text-[10px]">
           Pending
         </Badge>
-        <p className="whitespace-pre-wrap font-mono text-xs">{draft.body}</p>
+        <div>
+          {draft.start_line != null && (
+            <span className="text-[10px] text-muted-foreground block mb-0.5">
+              Lines {draft.start_line}--{draft.line}
+            </span>
+          )}
+          <p className="whitespace-pre-wrap font-mono text-xs">{draft.body}</p>
+        </div>
       </div>
       <div className="flex shrink-0 gap-1">
         <Button

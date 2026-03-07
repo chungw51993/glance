@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { X } from "lucide-react";
 import type { AiReviewSummary } from "@/types";
@@ -25,7 +25,7 @@ export function AiSummaryPanel({ review, onClose }: AiSummaryPanelProps) {
         </Button>
       </div>
       {review ? (
-        <ScrollArea className="min-h-0 flex-1">
+        <ScrollArea className="min-h-0 flex-1" type="auto">
           <div className="flex flex-col gap-6 px-4 py-4">
             {/* Risk level */}
             <div className="flex items-center gap-3">
@@ -68,7 +68,7 @@ export function AiSummaryPanel({ review, onClose }: AiSummaryPanelProps) {
                         {finding.message}
                       </p>
                       {finding.suggestion && (
-                        <pre className="mt-2 rounded bg-muted p-2 font-mono text-xs whitespace-pre-wrap">
+                        <pre className="mt-2 overflow-x-auto rounded bg-muted p-2 font-mono text-xs">
                           {finding.suggestion}
                         </pre>
                       )}
@@ -98,6 +98,7 @@ export function AiSummaryPanel({ review, onClose }: AiSummaryPanelProps) {
               </div>
             )}
           </div>
+          <ScrollBar orientation="horizontal" />
         </ScrollArea>
       ) : (
         <div className="flex h-64 items-center justify-center">
