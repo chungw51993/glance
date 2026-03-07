@@ -106,6 +106,7 @@ export interface DraftComment {
   id: string;
   file_path: string;
   line: number;
+  start_line?: number;
   side: "LEFT" | "RIGHT";
   body: string;
 }

@@ -40,7 +40,7 @@ export function CommitSidebar({
 
   return (
     <div
-      className="flex h-full shrink-0 flex-col border-r transition-all duration-200 overflow-hidden"
+      className="flex h-full shrink-0 flex-col border-r bg-background transition-all duration-200 overflow-hidden"
       style={{ width: collapsed ? 48 : 280 }}
     >
       {collapsed ? (

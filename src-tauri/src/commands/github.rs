@@ -129,6 +129,7 @@ pub async fn run_ai_review(
 pub struct ReviewComment {
     pub path: String,
     pub line: u64,
+    pub start_line: Option<u64>,
     pub side: String,
     pub body: String,
 }
