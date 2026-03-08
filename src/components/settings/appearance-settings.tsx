@@ -109,6 +109,7 @@ export function AppearanceSettings({
   const { highlighter } = useHighlighter();
   const [tokens, setTokens] = useState<ThemedToken[][] | null>(null);
   const [bg, setBg] = useState<string>("#1e1e1e");
+  const [fg, setFg] = useState<string>("#d4d4d4");
 
   const resolvedTheme =
     codeTheme === "auto"
@@ -130,8 +131,10 @@ export function AppearanceSettings({
     try {
       const theme = highlighter.getTheme(resolvedTheme);
       setBg(theme.bg || "#1e1e1e");
+      setFg(theme.fg || "#d4d4d4");
     } catch {
       setBg("#1e1e1e");
+      setFg("#d4d4d4");
     }
 
     return () => {
@@ -172,7 +175,7 @@ export function AppearanceSettings({
         {/* Theme preview */}
         <div
           className="rounded-md border overflow-hidden text-[13px] leading-[22px] font-mono"
-          style={{ background: bg }}
+          style={{ background: bg, color: fg }}
         >
           <div className="px-4 py-3 overflow-x-auto">
             <pre className="m-0">
