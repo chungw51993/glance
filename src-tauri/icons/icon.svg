@@ -4,28 +4,35 @@
       <stop offset="0%" style="stop-color:#0a0a0a"/>
       <stop offset="100%" style="stop-color:#1a1a1a"/>
     </linearGradient>
+    <clipPath id="icon-clip">
+      <rect x="40" y="40" width="432" height="432" rx="90"/>
+    </clipPath>
     <clipPath id="lens-clip">
       <circle cx="290" cy="250" r="79"/>
     </clipPath>
   </defs>
-  <rect width="512" height="512" rx="108" fill="url(#bg2)"/>
-  <!-- Diff lines behind lens -->
-  <rect x="140" y="160" width="120" height="14" rx="7" fill="#f87171" opacity="0.5"/>
-  <rect x="140" y="190" width="160" height="14" rx="7" fill="#4ade80" opacity="0.5"/>
-  <rect x="140" y="220" width="100" height="14" rx="7" fill="#475569" opacity="0.3"/>
-  <rect x="140" y="250" width="140" height="14" rx="7" fill="#f87171" opacity="0.5"/>
-  <rect x="140" y="280" width="180" height="14" rx="7" fill="#4ade80" opacity="0.5"/>
-  <rect x="140" y="310" width="90" height="14" rx="7" fill="#475569" opacity="0.3"/>
-  <!-- Magnifying glass -->
-  <circle cx="290" cy="250" r="90" fill="none" stroke="white" stroke-width="22" opacity="0.9"/>
-  <line x1="354" y1="314" x2="400" y2="370" stroke="white" stroke-width="26" stroke-linecap="round" opacity="0.9"/>
-  <!-- Bright diff lines inside lens -->
-  <g clip-path="url(#lens-clip)">
-    <rect x="140" y="160" width="120" height="14" rx="7" fill="#f87171" opacity="1"/>
-    <rect x="140" y="190" width="160" height="14" rx="7" fill="#4ade80" opacity="1"/>
-    <rect x="140" y="220" width="100" height="14" rx="7" fill="#94a3b8" opacity="0.6"/>
-    <rect x="140" y="250" width="140" height="14" rx="7" fill="#f87171" opacity="1"/>
-    <rect x="140" y="280" width="180" height="14" rx="7" fill="#4ade80" opacity="1"/>
-    <rect x="140" y="310" width="90" height="14" rx="7" fill="#94a3b8" opacity="0.6"/>
+  <!-- Smaller rounded rect background with padding -->
+  <rect x="40" y="40" width="432" height="432" rx="90" fill="url(#bg2)"/>
+  <!-- Clip all content to the rounded rect -->
+  <g clip-path="url(#icon-clip)">
+    <!-- Diff lines behind lens -->
+    <rect x="140" y="160" width="120" height="14" rx="7" fill="#f87171" opacity="0.5"/>
+    <rect x="140" y="190" width="160" height="14" rx="7" fill="#4ade80" opacity="0.5"/>
+    <rect x="140" y="220" width="100" height="14" rx="7" fill="#475569" opacity="0.3"/>
+    <rect x="140" y="250" width="140" height="14" rx="7" fill="#f87171" opacity="0.5"/>
+    <rect x="140" y="280" width="180" height="14" rx="7" fill="#4ade80" opacity="0.5"/>
+    <rect x="140" y="310" width="90" height="14" rx="7" fill="#475569" opacity="0.3"/>
+    <!-- Magnifying glass -->
+    <circle cx="290" cy="250" r="90" fill="none" stroke="white" stroke-width="22" opacity="0.9"/>
+    <line x1="354" y1="314" x2="400" y2="370" stroke="white" stroke-width="26" stroke-linecap="round" opacity="0.9"/>
+    <!-- Bright diff lines inside lens -->
+    <g clip-path="url(#lens-clip)">
+      <rect x="140" y="160" width="120" height="14" rx="7" fill="#f87171" opacity="1"/>
+      <rect x="140" y="190" width="160" height="14" rx="7" fill="#4ade80" opacity="1"/>
+      <rect x="140" y="220" width="100" height="14" rx="7" fill="#94a3b8" opacity="0.6"/>
+      <rect x="140" y="250" width="140" height="14" rx="7" fill="#f87171" opacity="1"/>
+      <rect x="140" y="280" width="180" height="14" rx="7" fill="#4ade80" opacity="1"/>
+      <rect x="140" y="310" width="90" height="14" rx="7" fill="#94a3b8" opacity="0.6"/>
+    </g>
   </g>
 </svg>
