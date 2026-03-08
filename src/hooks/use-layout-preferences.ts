@@ -4,6 +4,8 @@ import type { DiffScope } from "@/hooks/use-review";
 
 const STORAGE_KEY = "glance-layout";
 
+export type CodeTheme = "auto" | "github-dark" | "github-light" | "one-dark-pro" | "dracula" | "nord" | "min-light" | "solarized-dark" | "solarized-light" | "monokai" | "slack-dark" | "vitesse-dark" | "vitesse-light";
+
 interface LayoutPreferences {
   sidebarCollapsed: boolean;
   appSidebarCollapsed: boolean;
@@ -11,6 +13,7 @@ interface LayoutPreferences {
   hideMerges: boolean;
   linearPanelExpanded: boolean;
   diffScope: DiffScope;
+  codeTheme: CodeTheme;
 }
 
 const DEFAULTS: LayoutPreferences = {
@@ -20,6 +23,7 @@ const DEFAULTS: LayoutPreferences = {
   hideMerges: false,
   linearPanelExpanded: true,
   diffScope: "commit",
+  codeTheme: "auto",
 };
 
 function load(): LayoutPreferences {

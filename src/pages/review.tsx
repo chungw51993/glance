@@ -265,6 +265,7 @@ export function ReviewPage() {
                   aiAnnotations={annotationsForCommit}
                   draftComments={draftComments}
                   viewMode={prefs.diffViewMode}
+                  codeTheme={prefs.codeTheme}
                   onAddComment={addComment}
                   onRemoveComment={removeComment}
                   onUpdateComment={updateComment}

@@ -19,7 +19,8 @@ export function useTokenizedHunks(
   filePath: string,
   hunks: DiffHunk[],
   patch: string | null,
-  highlighter: Highlighter | null
+  highlighter: Highlighter | null,
+  codeTheme?: string
 ): TokenizedHunk[] | null {
   const [result, setResult] = useState<TokenizedHunk[] | null>(null);
   // Keep a ref to hunks so the effect can read them without re-firing
@@ -34,15 +35,19 @@ export function useTokenizedHunks(
 
     let cancelled = false;
     const lang = getLangFromPath(filePath);
-    const isDark = document.documentElement.classList.contains("dark");
-    const theme = isDark ? "github-dark" : "github-light";
+    const resolvedTheme =
+      codeTheme && codeTheme !== "auto"
+        ? codeTheme
+        : document.documentElement.classList.contains("dark")
+          ? "github-dark"
+          : "github-light";
     const currentHunks = hunksRef.current;
 
     async function run() {
       const tokenized: TokenizedHunk[] = [];
       for (const hunk of currentHunks) {
         const rawLines = hunk.lines.map((l) => l.content);
-        const tokens = await tokenizeLines(highlighter!, rawLines, lang, theme);
+        const tokens = await tokenizeLines(highlighter!, rawLines, lang, resolvedTheme);
         tokenized.push({ lineTokens: tokens });
       }
       if (!cancelled) {
@@ -56,7 +61,7 @@ export function useTokenizedHunks(
     };
     // patch is the stable string representation of the diff content.
     // filePath determines the language. highlighter readiness triggers first run.
-  }, [filePath, patch, highlighter]);
+  }, [filePath, patch, highlighter, codeTheme]);
 
   return result;
 }

@@ -71,10 +71,25 @@ const PRELOAD_LANGS = [
 
 let highlighterPromise: Promise<Highlighter> | null = null;
 
+const ALL_THEMES = [
+  "github-dark",
+  "github-light",
+  "one-dark-pro",
+  "dracula",
+  "nord",
+  "min-light",
+  "solarized-dark",
+  "solarized-light",
+  "monokai",
+  "slack-dark",
+  "vitesse-dark",
+  "vitesse-light",
+] as const;
+
 function getHighlighter(): Promise<Highlighter> {
   if (!highlighterPromise) {
     highlighterPromise = createHighlighter({
-      themes: ["github-dark", "github-light"],
+      themes: [...ALL_THEMES],
       langs: PRELOAD_LANGS,
     });
   }

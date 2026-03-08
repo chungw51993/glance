@@ -19,6 +19,7 @@ interface DiffPaneProps {
   aiAnnotations: AiAnnotation[];
   draftComments: DraftComment[];
   viewMode: DiffViewMode;
+  codeTheme?: string;
   onAddComment: (
     filePath: string,
     line: number,
@@ -123,6 +124,7 @@ export function DiffPane({
   aiAnnotations,
   draftComments,
   viewMode,
+  codeTheme,
   onAddComment,
   onRemoveComment,
   onUpdateComment,
@@ -164,6 +166,7 @@ export function DiffPane({
           file={file}
           viewMode={viewMode}
           highlighter={highlighter}
+          codeTheme={codeTheme}
           annotations={annotationMap.get(file.path) ?? EMPTY_ANNOTATIONS}
           draftComments={draftMap.get(file.path) ?? EMPTY_DRAFTS}
           onAddComment={onAddComment}
@@ -231,6 +234,7 @@ const FileSection = memo(function FileSection({
   file,
   viewMode,
   highlighter,
+  codeTheme,
   annotations,
   draftComments,
   onAddComment,
@@ -240,6 +244,7 @@ const FileSection = memo(function FileSection({
   file: FileDiff;
   viewMode: DiffViewMode;
   highlighter: import("shiki").Highlighter | null;
+  codeTheme?: string;
   annotations: AiAnnotation[];
   draftComments: DraftComment[];
   onAddComment: (
@@ -266,7 +271,8 @@ const FileSection = memo(function FileSection({
     file.path,
     parsed.hunks,
     shouldTokenize ? file.patch : null,
-    highlighter
+    highlighter,
+    codeTheme
   );
 
   return (
