@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import type { DiffViewMode } from "@/components/pr-review/diff-pane";
 import type { DiffScope } from "@/hooks/use-review";
 
-const STORAGE_KEY = "pr-reviewer-layout";
+const STORAGE_KEY = "glance-layout";
 
 interface LayoutPreferences {
   sidebarCollapsed: boolean;
