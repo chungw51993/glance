@@ -483,6 +483,28 @@ const SplitPane = memo(function SplitPane({
     setCommentText("");
   }, []);
 
+  const annotationsByLine = useMemo(() => {
+    const map = new Map<number, AiAnnotation[]>();
+    for (const a of annotations) {
+      const key = a.end_line;
+      const existing = map.get(key);
+      if (existing) existing.push(a);
+      else map.set(key, [a]);
+    }
+    return map;
+  }, [annotations]);
+
+  const draftsByKey = useMemo(() => {
+    const map = new Map<string, DraftComment[]>();
+    for (const d of draftComments) {
+      const key = `${d.line}-${d.side}`;
+      const existing = map.get(key);
+      if (existing) existing.push(d);
+      else map.set(key, [d]);
+    }
+    return map;
+  }, [draftComments]);
+
   return (
     <div className={className}>
       <table className="min-w-full border-collapse select-none">
@@ -509,15 +531,31 @@ const SplitPane = memo(function SplitPane({
               commentForm.side === side &&
               commentForm.endLine === lineNum;
 
+            const otherSideLine = side === "LEFT" ? row.right : row.left;
+            const otherLineNum = side === "LEFT"
+              ? (otherSideLine?.newLineNumber ?? null)
+              : (otherSideLine?.oldLineNumber ?? null);
+
+            const myAnnotations = lineNum !== null
+              ? (annotationsByLine.get(lineNum) ?? EMPTY_ANNOTATIONS)
+              : EMPTY_ANNOTATIONS;
+            const myDrafts = lineNum !== null
+              ? (draftsByKey.get(`${lineNum}-${side}`) ?? EMPTY_DRAFTS)
+              : EMPTY_DRAFTS;
+            const otherSideKey = side === "LEFT" ? "RIGHT" : "LEFT";
+            const otherHasAnnotations = otherLineNum !== null && annotationsByLine.has(otherLineNum);
+            const otherHasDrafts = otherLineNum !== null && draftsByKey.has(`${otherLineNum}-${otherSideKey}`);
+
             return (
               <SplitPaneRow
                 key={row.key}
                 side={side}
                 line={line}
                 tokens={side === "LEFT" ? row.leftTokens : row.rightTokens}
-                otherSideLine={side === "LEFT" ? row.right : row.left}
-                annotations={annotations}
-                draftComments={draftComments}
+                myAnnotations={myAnnotations}
+                myDrafts={myDrafts}
+                otherHasAnnotations={otherHasAnnotations}
+                otherHasDrafts={otherHasDrafts}
                 isSelected={isSelected}
                 commentForm={showFormAfterThisLine ? commentForm : null}
                 commentText={commentText}
@@ -562,6 +600,28 @@ const UnifiedDiffTable = memo(function UnifiedDiffTable({
   const [commentForm, setCommentForm] = useState<{ startLine: number; endLine: number; side: "LEFT" | "RIGHT" } | null>(null);
   const [commentText, setCommentText] = useState("");
   const draggingRef = useRef(false);
+
+  const annotationsByLine = useMemo(() => {
+    const map = new Map<number, AiAnnotation[]>();
+    for (const a of annotations) {
+      const key = a.end_line;
+      const existing = map.get(key);
+      if (existing) existing.push(a);
+      else map.set(key, [a]);
+    }
+    return map;
+  }, [annotations]);
+
+  const draftsByKey = useMemo(() => {
+    const map = new Map<string, DraftComment[]>();
+    for (const d of draftComments) {
+      const key = `${d.line}-${d.side}`;
+      const existing = map.get(key);
+      if (existing) existing.push(d);
+      else map.set(key, [d]);
+    }
+    return map;
+  }, [draftComments]);
 
   // Global mouseup to finalize selection
   useEffect(() => {
@@ -611,16 +671,6 @@ const UnifiedDiffTable = memo(function UnifiedDiffTable({
       <tbody>
         {parsed.hunks.map((hunk, hi) =>
           hunk.lines.map((line, li) => {
-            const lineAnnotations = annotations.filter(
-              (a) =>
-                (line.newLineNumber !== null &&
-                  line.newLineNumber === a.end_line) ||
-                (line.oldLineNumber !== null &&
-                  line.type === "deletion" &&
-                  line.newLineNumber === null &&
-                  line.oldLineNumber === a.end_line)
-            );
-
             const lineNumber =
               line.type === "deletion"
                 ? line.oldLineNumber
@@ -628,9 +678,17 @@ const UnifiedDiffTable = memo(function UnifiedDiffTable({
             const side: "LEFT" | "RIGHT" =
               line.type === "deletion" ? "LEFT" : "RIGHT";
 
-            const lineDrafts = draftComments.filter(
-              (c) => c.line === lineNumber && c.side === side
-            );
+            const effectiveAnnotationKey =
+              line.type === "deletion" && line.newLineNumber === null
+                ? line.oldLineNumber
+                : line.newLineNumber;
+            const lineAnnotations = effectiveAnnotationKey !== null
+              ? (annotationsByLine.get(effectiveAnnotationKey) ?? EMPTY_ANNOTATIONS)
+              : EMPTY_ANNOTATIONS;
+
+            const lineDrafts = lineNumber !== null
+              ? (draftsByKey.get(`${lineNumber}-${side}`) ?? EMPTY_DRAFTS)
+              : EMPTY_DRAFTS;
 
             const hunkTokens = tokenizedHunks?.[hi] ?? null;
             const isInDragSelection = isLineInSelection(lineNumber, side, selection);
@@ -681,9 +739,10 @@ const SplitPaneRow = memo(function SplitPaneRow({
   side,
   line,
   tokens,
-  otherSideLine,
-  annotations,
-  draftComments,
+  myAnnotations,
+  myDrafts,
+  otherHasAnnotations,
+  otherHasDrafts,
   isSelected,
   commentForm,
   commentText,
@@ -698,9 +757,10 @@ const SplitPaneRow = memo(function SplitPaneRow({
   side: "LEFT" | "RIGHT";
   line: DiffLine | null;
   tokens: ThemedToken[] | null;
-  otherSideLine: DiffLine | null;
-  annotations: AiAnnotation[];
-  draftComments: DraftComment[];
+  myAnnotations: AiAnnotation[];
+  myDrafts: DraftComment[];
+  otherHasAnnotations: boolean;
+  otherHasDrafts: boolean;
   isSelected: boolean;
   commentForm: { startLine: number; endLine: number; side: "LEFT" | "RIGHT" } | null;
   commentText: string;
@@ -716,10 +776,6 @@ const SplitPaneRow = memo(function SplitPaneRow({
     ? (line?.oldLineNumber ?? null)
     : (line?.newLineNumber ?? null);
 
-  const otherLineNum = side === "LEFT"
-    ? (otherSideLine?.newLineNumber ?? null)
-    : (otherSideLine?.oldLineNumber ?? null);
-
   const isAddition = line?.type === "addition";
   const isDeletion = line?.type === "deletion";
   const bg = isSelected
@@ -732,33 +788,6 @@ const SplitPaneRow = memo(function SplitPaneRow({
       : isAddition
         ? "bg-green-50 dark:bg-green-950"
         : "bg-background";
-
-  const myAnnotations = useMemo(
-    () =>
-      lineNum
-        ? annotations.filter((a) => lineNum === a.end_line)
-        : EMPTY_ANNOTATIONS,
-    [lineNum, annotations]
-  );
-
-  const otherHasAnnotations = useMemo(() => {
-    if (!otherLineNum) return false;
-    return annotations.some((a) => otherLineNum === a.end_line);
-  }, [otherLineNum, annotations]);
-
-  const myDrafts = useMemo(
-    () =>
-      lineNum
-        ? draftComments.filter((c) => c.line === lineNum && c.side === side)
-        : EMPTY_DRAFTS,
-    [lineNum, side, draftComments]
-  );
-
-  const otherHasDrafts = useMemo(() => {
-    if (!otherLineNum) return false;
-    const otherSide = side === "LEFT" ? "RIGHT" : "LEFT";
-    return draftComments.some((c) => c.line === otherLineNum && c.side === otherSide);
-  }, [otherLineNum, side, draftComments]);
 
   const hasAnnotationsBelow =
     myAnnotations.length > 0 ||

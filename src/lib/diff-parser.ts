@@ -28,7 +28,8 @@ export function parsePatch(patch: string | null): ParsedFileDiff {
   let oldLine = 0;
   let newLine = 0;
 
-  for (const raw of rawLines) {
+  for (let i = 0; i < rawLines.length; i++) {
+    const raw = rawLines[i];
     const headerMatch = raw.match(HUNK_HEADER);
     if (headerMatch) {
       currentHunk = {
@@ -64,7 +65,7 @@ export function parsePatch(patch: string | null): ParsedFileDiff {
       oldLine++;
     } else if (raw.startsWith(" ") || raw === "") {
       // Context line (or trailing empty line within a hunk)
-      if (raw === "" && rawLines.indexOf(raw) === rawLines.length - 1) {
+      if (raw === "" && i === rawLines.length - 1) {
         // Skip trailing empty line at end of patch
         continue;
       }

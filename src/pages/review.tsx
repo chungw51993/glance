@@ -216,7 +216,7 @@ export function ReviewPage() {
           onToggleCollapsed={() => update("sidebarCollapsed", !prefs.sidebarCollapsed)}
           onSelectFullPr={() => setDiffScope("full-pr")}
         />
-        <ResizablePanelGroup key={aiPanelOpen ? "with-ai" : "no-ai"} orientation="horizontal" className="flex-1">
+        <ResizablePanelGroup orientation="horizontal" className="flex-1">
           <ResizablePanel defaultSize={aiPanelOpen ? 50 : 100} minSize={50}>
             <div className="flex h-full flex-col overflow-hidden">
               <div className="flex shrink-0 items-center justify-between border-b bg-background px-4 py-1.5">

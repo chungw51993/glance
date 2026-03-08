@@ -1259,6 +1259,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "glance"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "indexmap 2.13.0",
+ "regex",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-opener",
+ "tauri-plugin-store",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
 name = "glib"
 version = "0.18.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2662,25 +2681,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
  "zerocopy",
-]
-
-[[package]]
-name = "pr-reviewer"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "chrono",
- "indexmap 2.13.0",
- "regex",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-opener",
- "tauri-plugin-store",
- "thiserror 2.0.18",
- "tokio",
 ]
 
 [[package]]

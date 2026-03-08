@@ -38,7 +38,7 @@ function TokenField({ label, hasToken, placeholder, onSave }: TokenFieldProps) {
       <div className="flex gap-2">
         <Input
           type="password"
-          placeholder={hasToken ? "Token saved in keychain" : placeholder}
+          placeholder={hasToken ? "Token saved locally" : placeholder}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {

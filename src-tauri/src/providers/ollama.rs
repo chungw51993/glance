@@ -18,7 +18,12 @@ impl OllamaProvider {
         let url = if base_url.is_empty() {
             DEFAULT_OLLAMA_URL.to_string()
         } else {
-            base_url.trim_end_matches('/').to_string()
+            let trimmed = base_url.trim_end_matches('/').to_string();
+            if !trimmed.starts_with("http://") && !trimmed.starts_with("https://") {
+                DEFAULT_OLLAMA_URL.to_string()
+            } else {
+                trimmed
+            }
         };
         Self {
             http: reqwest::Client::new(),
@@ -168,6 +173,18 @@ mod tests {
         let models = provider.list_models();
         assert!(models.len() >= 2);
         assert!(models.iter().any(|m| m.id.contains("qwen3")));
+    }
+
+    #[test]
+    fn test_ollama_provider_rejects_non_http_scheme() {
+        let provider = OllamaProvider::new("file:///etc/passwd".into(), "qwen3:32b".into());
+        assert_eq!(provider.base_url, "http://localhost:11434");
+    }
+
+    #[test]
+    fn test_ollama_provider_rejects_ftp_scheme() {
+        let provider = OllamaProvider::new("ftp://evil.com".into(), "qwen3:32b".into());
+        assert_eq!(provider.base_url, "http://localhost:11434");
     }
 
 }

@@ -2,6 +2,8 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 
+const remarkPlugins = [remarkGfm];
+
 interface MarkdownViewerProps {
   content: string;
   className?: string;
@@ -15,7 +17,7 @@ interface MarkdownViewerProps {
 export function MarkdownViewer({ content, className }: MarkdownViewerProps) {
   return (
     <div className={className}>
-      <Markdown remarkPlugins={[remarkGfm]} components={components}>
+      <Markdown remarkPlugins={remarkPlugins} components={components}>
         {content}
       </Markdown>
     </div>
