@@ -56,7 +56,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "Glance ${{ github.ref_name }}"
           releaseBody: |
-            See the [changelog](https://github.com/chungw51993/pr-reviewer/commits/${{ github.ref_name }}) for details.
+            See the [changelog](https://github.com/chungw51993/glance/commits/${{ github.ref_name }}) for details.
 
             ## Installation
             - **macOS (Apple Silicon)**: Download `.dmg` (aarch64)
