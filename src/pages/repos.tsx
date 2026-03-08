@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { useGitHub } from "@/hooks/use-github";
-import { getReposCache, setLastReposPath, updateReposCache } from "@/lib/repos-cache";
+import { clearPrsInvalidated, getReposCache, setLastReposPath, updateReposCache } from "@/lib/repos-cache";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,12 +42,14 @@ export function ReposPage() {
     updateReposCache({ selectedRepo });
   }, [selectedRepo]);
 
-  // Auto-refresh PRs when returning to the page with an empty (invalidated) list
+  // Auto-refresh PRs when returning to the page after cache was invalidated (e.g. after merge)
   useEffect(() => {
-    if (selectedRepo && pullRequests.length === 0 && !loadingPRs) {
+    const { prsInvalidated } = getReposCache();
+    if (selectedRepo && prsInvalidated && !loadingPRs) {
+      clearPrsInvalidated();
       fetchPullRequests(selectedRepo.owner, selectedRepo.name);
     }
-  }, [selectedRepo, pullRequests.length, loadingPRs, fetchPullRequests]);
+  }, [selectedRepo, loadingPRs, fetchPullRequests]);
 
   useEffect(() => {
     invoke<boolean>("has_github_token").then((has) => {
@@ -110,10 +112,9 @@ export function ReposPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={fetchRepos}
-            disabled={loadingRepos}
+            onClick={() => { if (!loadingRepos) fetchRepos(); }}
             title="Refresh repositories"
-            className="h-8 w-8 p-0"
+            className={`h-8 w-8 p-0${loadingRepos ? " pointer-events-none" : ""}`}
           >
             <RefreshIcon spinning={loadingRepos} />
           </Button>
@@ -190,12 +191,11 @@ export function ReposPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() =>
-                  fetchPullRequests(selectedRepo.owner, selectedRepo.name)
-                }
-                disabled={loadingPRs}
+                onClick={() => {
+                  if (!loadingPRs) fetchPullRequests(selectedRepo.owner, selectedRepo.name);
+                }}
                 title="Refresh pull requests"
-                className="h-8 w-8 p-0"
+                className={`h-8 w-8 p-0${loadingPRs ? " pointer-events-none" : ""}`}
               >
                 <RefreshIcon spinning={loadingPRs} />
               </Button>

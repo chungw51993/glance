@@ -144,10 +144,9 @@ export function PrHeader({
           <Button
             size="sm"
             variant="ghost"
-            onClick={onRefresh}
-            disabled={refreshing}
+            onClick={() => { if (!refreshing) onRefresh(); }}
             title="Refresh PR data"
-            className="h-8 w-8 p-0"
+            className={`h-8 w-8 p-0${refreshing ? " pointer-events-none" : ""}`}
           >
             <svg
               className={`h-4 w-4${refreshing ? " animate-spin" : ""}`}
