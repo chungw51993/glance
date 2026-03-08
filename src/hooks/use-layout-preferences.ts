@@ -4,7 +4,50 @@ import type { DiffScope } from "@/hooks/use-review";
 
 const STORAGE_KEY = "glance-layout";
 
-export type CodeTheme = "auto" | "github-dark" | "github-light" | "one-dark-pro" | "dracula" | "nord" | "min-light" | "solarized-dark" | "solarized-light" | "monokai" | "slack-dark" | "vitesse-dark" | "vitesse-light";
+export type CodeTheme =
+  | "auto"
+  | "andromeeda"
+  | "aurora-x"
+  | "ayu-dark"
+  | "catppuccin-frappe"
+  | "catppuccin-latte"
+  | "catppuccin-macchiato"
+  | "catppuccin-mocha"
+  | "dark-plus"
+  | "dracula"
+  | "dracula-soft"
+  | "everforest-dark"
+  | "everforest-light"
+  | "github-dark"
+  | "github-dark-dimmed"
+  | "github-light"
+  | "gruvbox-dark-medium"
+  | "gruvbox-light-medium"
+  | "houston"
+  | "kanagawa-wave"
+  | "light-plus"
+  | "material-theme"
+  | "material-theme-ocean"
+  | "material-theme-palenight"
+  | "min-dark"
+  | "min-light"
+  | "monokai"
+  | "night-owl"
+  | "nord"
+  | "one-dark-pro"
+  | "one-light"
+  | "poimandres"
+  | "rose-pine"
+  | "rose-pine-dawn"
+  | "rose-pine-moon"
+  | "slack-dark"
+  | "solarized-dark"
+  | "solarized-light"
+  | "synthwave-84"
+  | "tokyo-night"
+  | "vesper"
+  | "vitesse-dark"
+  | "vitesse-light";
 
 interface LayoutPreferences {
   sidebarCollapsed: boolean;
