@@ -1,10 +1,10 @@
-# PR Reviewer
+# Glance
 
 A desktop application for reviewing GitHub pull requests with AI-powered analysis. Built with Tauri 2 (Rust backend) and React (TypeScript frontend).
 
 ## What It Does
 
-PR Reviewer brings your GitHub PR workflow into a native desktop app. It fetches your repositories and pull requests, displays commit-level diffs with syntax highlighting, and runs AI-powered code reviews to surface issues before you approve.
+Glance brings your GitHub PR workflow into a native desktop app. It fetches your repositories and pull requests, displays commit-level diffs with syntax highlighting, and runs AI-powered code reviews to surface issues before you approve.
 
 ### Features
 
@@ -16,6 +16,7 @@ PR Reviewer brings your GitHub PR workflow into a native desktop app. It fetches
 - **Linear integration** -- extracts Linear ticket IDs from branch names and fetches ticket context for AI review
 - **PR actions** -- approve, request changes, comment, and merge directly from the app
 - **Draft review comments** -- write inline comments on specific lines before submitting
+- **42 code themes** -- syntax highlighting themes from Dracula to Catppuccin
 
 ## Prerequisites
 
@@ -69,6 +70,10 @@ Once the window opens, go to **Settings** (gear icon in the sidebar):
    - **Ollama** -- point to your local Ollama instance (no API key needed)
 3. Optionally add a **Linear API key** for ticket context
 
+## Downloads
+
+See [GitHub Releases](https://github.com/chungw51993/glance/releases) for pre-built binaries (macOS, Windows, Linux).
+
 ## Running Tests
 
 ### Frontend (Vitest + React Testing Library)
@@ -101,7 +106,7 @@ This compiles the Rust backend in release mode and bundles the frontend into a n
 ## Project Structure
 
 ```
-pr-reviewer/
+glance/
   src/                        # React frontend
     components/
       layout/                 # App shell, sidebar navigation
@@ -128,7 +133,7 @@ pr-reviewer/
 | Backend | Rust (tokio, reqwest, serde) |
 | Frontend | React 19, TypeScript, Vite 7 |
 | Styling | Tailwind CSS 4, ShadCN UI |
-| Syntax highlighting | Shiki |
+| Syntax highlighting | Shiki (42 themes) |
 | Routing | React Router 7 |
 | Testing | Vitest, React Testing Library, Cargo test |
 | Secure storage | tauri-plugin-store (encrypted key storage) |
