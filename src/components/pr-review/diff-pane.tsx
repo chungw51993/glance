@@ -822,7 +822,7 @@ const SplitPaneRow = memo(function SplitPaneRow({
     <>
       <tr className="group/row">
         <td
-          className={`sticky left-0 z-10 w-10 cursor-pointer border-r px-1.5 text-right font-mono text-xs text-muted-foreground ${stickyBg}`}
+          className={`sticky left-0 z-10 w-10 cursor-pointer border-r px-1.5 text-right font-mono text-xs leading-5 text-muted-foreground ${stickyBg}`}
           onMouseDown={(e) => {
             if (line && lineNum !== null) {
               e.preventDefault();
@@ -837,7 +837,7 @@ const SplitPaneRow = memo(function SplitPaneRow({
         >
           {lineNum ?? ""}
         </td>
-        <td className={`whitespace-pre pl-1 font-mono text-xs ${bg}`}>
+        <td className={`whitespace-pre pl-1 font-mono text-xs leading-5 ${bg}`}>
           {line && (
             <span className={colorClass}>
               {prefix}
@@ -1004,7 +1004,7 @@ const UnifiedDiffRow = memo(function UnifiedDiffRow({
     <>
       <tr className={`group/row ${rowClass}`}>
         <td
-          className={`sticky left-0 z-10 w-12 cursor-pointer border-r px-2 text-right font-mono text-xs text-muted-foreground ${stickyBg}`}
+          className={`sticky left-0 z-10 w-12 cursor-pointer border-r px-2 text-right font-mono text-xs leading-5 text-muted-foreground ${stickyBg}`}
           onMouseDown={(e) => {
             if (type !== "addition" && oldLineNumber !== null) {
               e.preventDefault();
@@ -1020,7 +1020,7 @@ const UnifiedDiffRow = memo(function UnifiedDiffRow({
           {oldLineNumber ?? ""}
         </td>
         <td
-          className={`sticky left-12 z-10 w-12 cursor-pointer border-r px-2 text-right font-mono text-xs text-muted-foreground ${stickyBg}`}
+          className={`sticky left-12 z-10 w-12 cursor-pointer border-r px-2 text-right font-mono text-xs leading-5 text-muted-foreground ${stickyBg}`}
           onMouseDown={(e) => {
             if (type !== "deletion" && newLineNumber !== null) {
               e.preventDefault();
@@ -1035,7 +1035,7 @@ const UnifiedDiffRow = memo(function UnifiedDiffRow({
         >
           {newLineNumber ?? ""}
         </td>
-        <td className="whitespace-pre pl-1 font-mono text-xs">
+        <td className="whitespace-pre pl-1 font-mono text-xs leading-5">
           <span
             className={
               !tokens
