@@ -92,6 +92,26 @@ describe("parsePatch", () => {
     expect(result.hunks[0].newCount).toBe(1);
   });
 
+  it("handles empty context lines in the middle of a hunk", () => {
+    const patch = [
+      "@@ -1,5 +1,5 @@",
+      " first",
+      "",
+      " third",
+      "-old",
+      "+new",
+    ].join("\n");
+
+    const result = parsePatch(patch);
+    expect(result.hunks[0].lines).toHaveLength(5);
+    expect(result.hunks[0].lines[1]).toEqual({
+      type: "context",
+      content: "",
+      oldLineNumber: 2,
+      newLineNumber: 2,
+    });
+  });
+
   it("skips 'no newline at end of file' markers", () => {
     const patch = [
       "@@ -1,2 +1,2 @@",
