@@ -1,6 +1,9 @@
 import { useSettings } from "@/hooks/use-settings";
+import { useLayoutPreferences } from "@/hooks/use-layout-preferences";
+import type { CodeTheme } from "@/hooks/use-layout-preferences";
 import { ProviderSettings } from "@/components/settings/provider-settings";
 import { AccountSettings } from "@/components/settings/account-settings";
+import { AppearanceSettings } from "@/components/settings/appearance-settings";
 
 export function SettingsPage() {
   const {
@@ -22,6 +25,8 @@ export function SettingsPage() {
     saveOllamaUrl,
   } = useSettings();
 
+  const { prefs, update } = useLayoutPreferences();
+
   if (loading) {
     return (
       <div className="p-6">
@@ -33,6 +38,10 @@ export function SettingsPage() {
   return (
     <div className="p-6 space-y-6 max-w-2xl">
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+      <AppearanceSettings
+        codeTheme={prefs.codeTheme}
+        onChangeCodeTheme={(theme: CodeTheme) => update("codeTheme", theme)}
+      />
       <ProviderSettings
         providerConfig={providerConfig}
         models={models}
