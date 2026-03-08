@@ -20,6 +20,11 @@ export function updateReposCache(partial: Partial<ReposCacheEntry>): void {
   _cache = { ..._cache, ...partial };
 }
 
+/** Mark the cached pull request list as stale so the next visit triggers a refresh. */
+export function invalidatePullRequests(): void {
+  _cache = { ..._cache, pullRequests: [] };
+}
+
 // Tracks the last path in the repos/review area so the sidebar can restore it
 let _lastReposPath = "/";
 
