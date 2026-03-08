@@ -123,4 +123,54 @@ describe("parsePatch", () => {
     const result = parsePatch(patch);
     expect(result.hunks[0].lines).toHaveLength(2);
   });
+
+  it("handles hunk header with function context", () => {
+    const patch = [
+      "@@ -10,3 +10,3 @@ function foo() {",
+      " before",
+      "-old",
+      "+new",
+    ].join("\n");
+
+    const result = parsePatch(patch);
+    expect(result.hunks).toHaveLength(1);
+    expect(result.hunks[0].oldStart).toBe(10);
+  });
+
+  it("ignores lines before the first hunk header", () => {
+    const patch = [
+      "diff --git a/file.ts b/file.ts",
+      "index abc123..def456 100644",
+      "--- a/file.ts",
+      "+++ b/file.ts",
+      "@@ -1,2 +1,2 @@",
+      "-old",
+      "+new",
+      " ctx",
+    ].join("\n");
+
+    const result = parsePatch(patch);
+    expect(result.hunks).toHaveLength(1);
+    expect(result.hunks[0].lines).toHaveLength(3);
+  });
+
+  it("handles trailing newline at end of patch", () => {
+    const patch = "@@ -1,1 +1,1 @@\n-old\n+new\n";
+
+    const result = parsePatch(patch);
+    expect(result.hunks[0].lines).toHaveLength(2);
+  });
+
+  it("handles zero-count old side (new file)", () => {
+    const patch = [
+      "@@ -0,0 +1,2 @@",
+      "+line one",
+      "+line two",
+    ].join("\n");
+
+    const result = parsePatch(patch);
+    expect(result.hunks[0].oldStart).toBe(0);
+    expect(result.hunks[0].oldCount).toBe(0);
+    expect(result.hunks[0].lines).toHaveLength(2);
+  });
 });
