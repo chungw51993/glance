@@ -112,7 +112,7 @@ export function AiSummaryPanel({ review, onClose }: AiSummaryPanelProps) {
 }
 
 function scrollToFile(filePath: string) {
-  const el = document.querySelector(`[data-file-path="${filePath}"]`);
+  const el = document.querySelector(`[data-file-path="${CSS.escape(filePath)}"]`);
   if (el) {
     el.scrollIntoView({ behavior: "smooth", block: "start" });
   }
