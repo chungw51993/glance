@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { getReviewCache, updateReviewCache } from "@/lib/review-cache";
-import { setLastReposPath } from "@/lib/repos-cache";
+import { invalidatePullRequests, setLastReposPath } from "@/lib/repos-cache";
 import { useReview } from "@/hooks/use-review";
 import { useReviewDraft } from "@/hooks/use-review-draft";
 import { useLayoutPreferences } from "@/hooks/use-layout-preferences";
@@ -118,6 +118,7 @@ export function ReviewPage() {
       if (!owner || !name || !prNumber) return;
       await mergePR(owner, name, Number(prNumber), title, message, method);
       toast.success("Pull request merged");
+      invalidatePullRequests();
       navigate("/");
     },
     [owner, name, prNumber, mergePR, navigate]

@@ -19,6 +19,11 @@ export function LinearTicketsPanel({
   expanded: panelExpanded,
   onToggleExpanded,
 }: LinearTicketsPanelProps) {
+  // Hide the panel entirely when there's nothing useful to show:
+  // no token configured, no tickets found and not loading, or no real error
+  const isNoToken = error?.startsWith("NO_TOKEN:");
+  const hasContent = tickets.length > 0 || (error && !isNoToken);
+  if (!loading && !hasContent) return null;
 
   return (
     <div className="shrink-0 border-t bg-background">
@@ -43,19 +48,8 @@ export function LinearTicketsPanel({
       </button>
       {panelExpanded && (
         <ScrollArea className="max-h-[40vh] px-4 pb-2">
-          {error && error.startsWith("NO_TOKEN:") && (
-            <p className="text-xs text-muted-foreground py-2">
-              {error.replace("NO_TOKEN: ", "")}
-            </p>
-          )}
-          {error && !error.startsWith("NO_TOKEN:") && (
+          {error && !isNoToken && (
             <p className="text-xs text-destructive py-1">{error}</p>
-          )}
-          {!loading && !error && tickets.length === 0 && (
-            <p className="text-xs text-muted-foreground py-2">
-              No Linear tickets found for this PR. Tickets are extracted from
-              the PR title, body, and commit messages (e.g. ENG-123).
-            </p>
           )}
           {tickets.length === 1 && (
             <SingleTicketView ticket={tickets[0]} />

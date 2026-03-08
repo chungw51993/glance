@@ -42,6 +42,13 @@ export function ReposPage() {
     updateReposCache({ selectedRepo });
   }, [selectedRepo]);
 
+  // Auto-refresh PRs when returning to the page with an empty (invalidated) list
+  useEffect(() => {
+    if (selectedRepo && pullRequests.length === 0 && !loadingPRs) {
+      fetchPullRequests(selectedRepo.owner, selectedRepo.name);
+    }
+  }, [selectedRepo, pullRequests.length, loadingPRs, fetchPullRequests]);
+
   useEffect(() => {
     invoke<boolean>("has_github_token").then((has) => {
       setHasToken(has);
@@ -105,8 +112,10 @@ export function ReposPage() {
             size="sm"
             onClick={fetchRepos}
             disabled={loadingRepos}
+            title="Refresh repositories"
+            className="h-8 w-8 p-0"
           >
-            {loadingRepos ? "Loading..." : "Refresh"}
+            <RefreshIcon spinning={loadingRepos} />
           </Button>
         </div>
 
@@ -185,8 +194,10 @@ export function ReposPage() {
                   fetchPullRequests(selectedRepo.owner, selectedRepo.name)
                 }
                 disabled={loadingPRs}
+                title="Refresh pull requests"
+                className="h-8 w-8 p-0"
               >
-                {loadingPRs ? "Loading..." : "Refresh"}
+                <RefreshIcon spinning={loadingPRs} />
               </Button>
             </div>
 
@@ -254,6 +265,24 @@ export function ReposPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function RefreshIcon({ spinning }: { spinning: boolean }) {
+  return (
+    <svg
+      className={`h-4 w-4${spinning ? " animate-spin" : ""}`}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+      <path d="M21 3v5h-5" />
+    </svg>
   );
 }
 
