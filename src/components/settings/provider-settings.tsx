@@ -162,7 +162,7 @@ export function ProviderSettings({
               <Input
                 type="password"
                 placeholder={
-                  hasKey ? "Key saved in keychain" : "Enter API key"
+                  hasKey ? "Key saved locally" : "Enter API key"
                 }
                 value={apiKeyInput}
                 onChange={(e) => setApiKeyInput(e.target.value)}
