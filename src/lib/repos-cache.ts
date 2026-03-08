@@ -4,12 +4,14 @@ interface ReposCacheEntry {
   repos: Repo[];
   selectedRepo: Repo | null;
   pullRequests: PullRequestSummary[];
+  prsInvalidated: boolean;
 }
 
 let _cache: ReposCacheEntry = {
   repos: [],
   selectedRepo: null,
   pullRequests: [],
+  prsInvalidated: false,
 };
 
 export function getReposCache(): ReposCacheEntry {
@@ -22,7 +24,11 @@ export function updateReposCache(partial: Partial<ReposCacheEntry>): void {
 
 /** Mark the cached pull request list as stale so the next visit triggers a refresh. */
 export function invalidatePullRequests(): void {
-  _cache = { ..._cache, pullRequests: [] };
+  _cache = { ..._cache, pullRequests: [], prsInvalidated: true };
+}
+
+export function clearPrsInvalidated(): void {
+  _cache = { ..._cache, prsInvalidated: false };
 }
 
 // Tracks the last path in the repos/review area so the sidebar can restore it

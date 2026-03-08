@@ -73,10 +73,9 @@ export function AssignedPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={fetch}
-          disabled={loading}
+          onClick={() => { if (!loading) fetch(); }}
           title="Refresh assigned PRs"
-          className="h-8 w-8 p-0"
+          className={`h-8 w-8 p-0${loading ? " pointer-events-none" : ""}`}
         >
           <svg
             className={`h-4 w-4${loading ? " animate-spin" : ""}`}
