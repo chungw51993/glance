@@ -4,6 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface TokenFieldProps {
   label: string;
@@ -75,6 +82,80 @@ interface AccountSettingsProps {
   onSaveAsanaToken: (token: string) => Promise<void>;
 }
 
+type TicketProviderKey = "linear" | "jira" | "asana";
+
+const ticketProviders: { key: TicketProviderKey; label: string }[] = [
+  { key: "linear", label: "Linear" },
+  { key: "jira", label: "Jira" },
+  { key: "asana", label: "Asana" },
+];
+
+function TicketProviderFields({
+  provider,
+  hasLinearToken,
+  hasJiraCredentials,
+  jiraDomain,
+  hasAsanaToken,
+  onSaveLinearToken,
+  onSaveJiraCredentials,
+  onSaveJiraDomain,
+  onSaveAsanaToken,
+}: {
+  provider: TicketProviderKey;
+} & Pick<
+  AccountSettingsProps,
+  | "hasLinearToken"
+  | "hasJiraCredentials"
+  | "jiraDomain"
+  | "hasAsanaToken"
+  | "onSaveLinearToken"
+  | "onSaveJiraCredentials"
+  | "onSaveJiraDomain"
+  | "onSaveAsanaToken"
+>) {
+  switch (provider) {
+    case "linear":
+      return (
+        <TokenField
+          label="API Key"
+          hasToken={hasLinearToken}
+          placeholder="lin_api_..."
+          onSave={onSaveLinearToken}
+        />
+      );
+    case "jira":
+      return (
+        <div className="space-y-4">
+          <TokenField
+            label="Credentials"
+            hasToken={hasJiraCredentials}
+            placeholder="email@company.com:api_token"
+            hint="Format: email:api_token. Generate an API token from id.atlassian.com."
+            onSave={onSaveJiraCredentials}
+          />
+          <TokenField
+            label="Domain"
+            hasToken={!!jiraDomain}
+            placeholder="mycompany.atlassian.net"
+            hint="Your Jira Cloud domain (e.g. mycompany.atlassian.net)"
+            type="text"
+            onSave={onSaveJiraDomain}
+          />
+        </div>
+      );
+    case "asana":
+      return (
+        <TokenField
+          label="Personal Access Token"
+          hasToken={hasAsanaToken}
+          placeholder="1/1234567890..."
+          hint="Generate from Settings > Apps > Developer Apps in Asana."
+          onSave={onSaveAsanaToken}
+        />
+      );
+  }
+}
+
 export function AccountSettings({
   hasGithubToken,
   hasLinearToken,
@@ -87,53 +168,66 @@ export function AccountSettings({
   onSaveJiraDomain,
   onSaveAsanaToken,
 }: AccountSettingsProps) {
+  const [selectedProvider, setSelectedProvider] = useState<TicketProviderKey>("linear");
+
+  const configuredCount = [hasLinearToken, hasJiraCredentials, hasAsanaToken].filter(Boolean).length;
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Accounts</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <TokenField
-          label="GitHub Personal Access Token"
-          hasToken={hasGithubToken}
-          placeholder="ghp_..."
-          hint="Requires repo scope. Add read:org to also see PRs assigned to your teams."
-          onSave={onSaveGithubToken}
-        />
-        <div className="border-t pt-4">
-          <p className="text-xs font-medium text-muted-foreground mb-3">Ticket Providers</p>
-          <div className="space-y-4">
-            <TokenField
-              label="Linear API Key"
-              hasToken={hasLinearToken}
-              placeholder="lin_api_..."
-              onSave={onSaveLinearToken}
-            />
-            <TokenField
-              label="Jira Credentials"
-              hasToken={hasJiraCredentials}
-              placeholder="email@company.com:api_token"
-              hint="Format: email:api_token. Generate an API token from id.atlassian.com."
-              onSave={onSaveJiraCredentials}
-            />
-            <TokenField
-              label="Jira Domain"
-              hasToken={!!jiraDomain}
-              placeholder="mycompany.atlassian.net"
-              hint="Your Jira Cloud domain (e.g. mycompany.atlassian.net)"
-              type="text"
-              onSave={onSaveJiraDomain}
-            />
-            <TokenField
-              label="Asana Personal Access Token"
-              hasToken={hasAsanaToken}
-              placeholder="1/1234567890..."
-              hint="Generate from Settings > Apps > Developer Apps in Asana."
-              onSave={onSaveAsanaToken}
-            />
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>GitHub</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <TokenField
+            label="Personal Access Token"
+            hasToken={hasGithubToken}
+            placeholder="ghp_..."
+            hint="Requires repo scope. Add read:org to also see PRs assigned to your teams."
+            onSave={onSaveGithubToken}
+          />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <CardTitle>Ticket Providers</CardTitle>
+            {configuredCount > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {configuredCount} configured
+              </Badge>
+            )}
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Provider</Label>
+            <Select value={selectedProvider} onValueChange={(v) => setSelectedProvider(v as TicketProviderKey)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ticketProviders.map((p) => (
+                  <SelectItem key={p.key} value={p.key}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <TicketProviderFields
+            provider={selectedProvider}
+            hasLinearToken={hasLinearToken}
+            hasJiraCredentials={hasJiraCredentials}
+            jiraDomain={jiraDomain}
+            hasAsanaToken={hasAsanaToken}
+            onSaveLinearToken={onSaveLinearToken}
+            onSaveJiraCredentials={onSaveJiraCredentials}
+            onSaveJiraDomain={onSaveJiraDomain}
+            onSaveAsanaToken={onSaveAsanaToken}
+          />
+        </CardContent>
+      </Card>
+    </>
   );
 }
