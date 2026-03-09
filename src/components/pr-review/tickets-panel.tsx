@@ -2,23 +2,23 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { MarkdownViewer } from "@/components/pr-review/markdown-viewer";
-import type { LinearTicket } from "@/types";
+import type { Ticket } from "@/types";
 
-interface LinearTicketsPanelProps {
-  tickets: LinearTicket[];
+interface TicketsPanelProps {
+  tickets: Ticket[];
   loading: boolean;
   error?: string | null;
   expanded: boolean;
   onToggleExpanded: () => void;
 }
 
-export function LinearTicketsPanel({
+export function TicketsPanel({
   tickets,
   loading,
   error,
   expanded: panelExpanded,
   onToggleExpanded,
-}: LinearTicketsPanelProps) {
+}: TicketsPanelProps) {
   // Hide the panel entirely when there's nothing useful to show:
   // no token configured, no tickets found and not loading, or no real error
   const isNoToken = error?.startsWith("NO_TOKEN:");
@@ -33,7 +33,7 @@ export function LinearTicketsPanel({
       >
         <Chevron direction={panelExpanded ? "down" : "up"} />
         <span className="text-xs font-medium text-muted-foreground">
-          Linear Context
+          Ticket Context
         </span>
         {tickets.length > 0 && (
           <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
@@ -67,7 +67,7 @@ export function LinearTicketsPanel({
 // Tabbed view for multiple tickets
 // ---------------------------------------------------------------------------
 
-function TabbedTicketsView({ tickets }: { tickets: LinearTicket[] }) {
+function TabbedTicketsView({ tickets }: { tickets: Ticket[] }) {
   return (
     <Tabs defaultValue={tickets[0].identifier} className="flex flex-col">
       <TabsList variant="line" className="sticky top-0 z-10 bg-background w-full justify-start gap-0 overflow-x-auto shrink-0">
@@ -78,6 +78,7 @@ function TabbedTicketsView({ tickets }: { tickets: LinearTicket[] }) {
             className="gap-1.5 text-xs px-3 py-1.5 shrink-0"
           >
             <code className="font-semibold">{ticket.identifier}</code>
+            <ProviderBadge provider={ticket.provider} />
             <StateBadge state={ticket.state} />
           </TabsTrigger>
         ))}
@@ -95,13 +96,14 @@ function TabbedTicketsView({ tickets }: { tickets: LinearTicket[] }) {
 // Single ticket (no tabs needed)
 // ---------------------------------------------------------------------------
 
-function SingleTicketView({ ticket }: { ticket: LinearTicket }) {
+function SingleTicketView({ ticket }: { ticket: Ticket }) {
   return (
     <div className="rounded-md border bg-card overflow-hidden">
       <div className="flex items-center gap-2 flex-wrap p-2.5">
         <code className="text-xs font-semibold text-primary">
           {ticket.identifier}
         </code>
+        <ProviderBadge provider={ticket.provider} />
         <StateBadge state={ticket.state} />
         {ticket.labels.map((label) => (
           <Badge key={label} variant="outline" className="text-[9px] px-1 py-0">
@@ -121,7 +123,7 @@ function SingleTicketView({ ticket }: { ticket: LinearTicket }) {
 // Shared ticket detail (used inside tabs)
 // ---------------------------------------------------------------------------
 
-function TicketDetail({ ticket }: { ticket: LinearTicket }) {
+function TicketDetail({ ticket }: { ticket: Ticket }) {
   return (
     <div className="pt-2">
       <div className="flex items-center gap-2 flex-wrap mb-1.5">
@@ -139,7 +141,7 @@ function TicketDetail({ ticket }: { ticket: LinearTicket }) {
   );
 }
 
-function TicketBody({ ticket }: { ticket: LinearTicket }) {
+function TicketBody({ ticket }: { ticket: Ticket }) {
   return (
     <>
       {ticket.description ? (
@@ -155,7 +157,7 @@ function TicketBody({ ticket }: { ticket: LinearTicket }) {
         rel="noopener noreferrer"
         className="inline-block mt-2 text-[11px] text-primary hover:underline"
       >
-        Open in Linear
+        Open in {ticket.provider}
       </a>
     </>
   );
@@ -167,12 +169,33 @@ function TicketBody({ ticket }: { ticket: LinearTicket }) {
 
 const stateColors: Record<string, string> = {
   "Done": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+  "Completed": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+  "closed": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
   "In Progress": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
   "In Review": "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
   "Todo": "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+  "Open": "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+  "open": "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
   "Backlog": "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300",
   "Cancelled": "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
 };
+
+const providerColors: Record<string, string> = {
+  "Linear": "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300",
+  "Jira": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+  "GitHub Issues": "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300",
+  "Asana": "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
+};
+
+function ProviderBadge({ provider }: { provider: string }) {
+  return (
+    <Badge
+      className={`text-[9px] px-1 py-0 ${providerColors[provider] ?? "bg-muted text-muted-foreground"}`}
+    >
+      {provider}
+    </Badge>
+  );
+}
 
 function StateBadge({ state }: { state: string }) {
   return (

@@ -4,6 +4,7 @@ use tauri_plugin_store::Store;
 const STORE_FILE: &str = "settings.json";
 const PROVIDER_CONFIG_KEY: &str = "provider_config";
 const OLLAMA_URL_KEY: &str = "ollama_url";
+const JIRA_DOMAIN_KEY: &str = "jira_domain";
 
 pub fn get_provider_config<R: tauri::Runtime>(store: &Store<R>) -> ProviderConfig {
     store
@@ -33,6 +34,21 @@ pub fn set_ollama_url<R: tauri::Runtime>(
     url: &str,
 ) -> Result<(), String> {
     store.set(OLLAMA_URL_KEY, serde_json::Value::String(url.to_string()));
+    store.save().map_err(|e| e.to_string())
+}
+
+pub fn get_jira_domain<R: tauri::Runtime>(store: &Store<R>) -> String {
+    store
+        .get(JIRA_DOMAIN_KEY)
+        .and_then(|v| v.as_str().map(|s| s.to_string()))
+        .unwrap_or_default()
+}
+
+pub fn set_jira_domain<R: tauri::Runtime>(
+    store: &Store<R>,
+    domain: &str,
+) -> Result<(), String> {
+    store.set(JIRA_DOMAIN_KEY, serde_json::Value::String(domain.to_string()));
     store.save().map_err(|e| e.to_string())
 }
 

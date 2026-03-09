@@ -5,10 +5,10 @@ import type {
   AiReviewSummary,
   Commit,
   FileDiff,
-  LinearTicket,
   MergeMethod,
   MergeStatus,
   PullRequestDetail,
+  Ticket,
 } from "@/types";
 
 export type DiffScope = "commit" | "full-pr";
@@ -24,9 +24,9 @@ interface UseReviewOptions {
 interface UseReviewReturn {
   pr: PullRequestDetail | null;
   aiReview: AiReviewSummary | null;
-  linearTickets: LinearTicket[];
-  linearLoading: boolean;
-  linearError: string | null;
+  tickets: Ticket[];
+  ticketsLoading: boolean;
+  ticketsError: string | null;
   selectedCommitIndex: number;
   hideMerges: boolean;
   loading: boolean;
@@ -62,9 +62,9 @@ export function useReview(options: UseReviewOptions): UseReviewReturn {
 
   const [pr, setPr] = useState<PullRequestDetail | null>(cached?.pr ?? null);
   const [aiReview, setAiReview] = useState<AiReviewSummary | null>(cached?.aiReview ?? null);
-  const [linearTickets, setLinearTickets] = useState<LinearTicket[]>(cached?.linearTickets ?? []);
-  const [linearLoading, setLinearLoading] = useState(false);
-  const [linearError, setLinearError] = useState<string | null>(cached?.linearError ?? null);
+  const [tickets, setTickets] = useState<Ticket[]>(cached?.tickets ?? []);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [ticketsError, setTicketsError] = useState<string | null>(cached?.ticketsError ?? null);
   const [selectedCommitIndex, setSelectedCommitIndex] = useState(cached?.selectedCommitIndex ?? 0);
   const [loading, setLoading] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -84,13 +84,13 @@ export function useReview(options: UseReviewOptions): UseReviewReturn {
       prKey,
       pr,
       aiReview,
-      linearTickets,
-      linearError,
+      tickets,
+      ticketsError,
       mergeStatus,
       prFiles,
       selectedCommitIndex,
     });
-  }, [prKey, pr, aiReview, linearTickets, linearError, mergeStatus, prFiles, selectedCommitIndex]);
+  }, [prKey, pr, aiReview, tickets, ticketsError, mergeStatus, prFiles, selectedCommitIndex]);
 
   const visibleCommits = useMemo(() => {
     if (!pr) return [];
@@ -100,8 +100,8 @@ export function useReview(options: UseReviewOptions): UseReviewReturn {
   }, [pr, hideMerges]);
 
   const fetchPRDetail = useCallback(
-    async (owner: string, repo: string, prNumber: number) => {
-      const newKey = `${owner}/${repo}/${prNumber}`;
+    async (ownerArg: string, repoArg: string, prNumber: number) => {
+      const newKey = `${ownerArg}/${repoArg}/${prNumber}`;
       const isSamePR = newKey === activeKeyRef.current;
       const existingCache = getReviewCache(newKey);
 
@@ -113,21 +113,21 @@ export function useReview(options: UseReviewOptions): UseReviewReturn {
         if (!existingCache?.aiReview) {
           setAiReview(null);
         }
-        setLinearTickets(existingCache?.linearTickets ?? []);
+        setTickets(existingCache?.tickets ?? []);
         setSelectedCommitIndex(existingCache?.selectedCommitIndex ?? 0);
       }
 
       try {
         const result = await invoke<PullRequestDetail>(
           "get_pull_request_detail",
-          { owner, repo, prNumber }
+          { owner: ownerArg, repo: repoArg, prNumber }
         );
         setPr(result);
 
         // Fetch merge status after PR loads
         invoke<MergeStatus>("get_pr_merge_status", {
-          owner,
-          repo,
+          owner: ownerArg,
+          repo: repoArg,
           prNumber,
         })
           .then(setMergeStatus)
@@ -135,30 +135,32 @@ export function useReview(options: UseReviewOptions): UseReviewReturn {
 
         // Fetch full PR files (aggregate diff) in background
         setPrFilesLoading(true);
-        invoke<FileDiff[]>("get_pr_files", { owner, repo, prNumber })
+        invoke<FileDiff[]>("get_pr_files", { owner: ownerArg, repo: repoArg, prNumber })
           .then(setPrFiles)
           .catch(() => setPrFiles([]))
           .finally(() => setPrFilesLoading(false));
 
-        // Skip re-fetching Linear tickets if returning to same PR with cached data
-        if (isSamePR && existingCache?.linearTickets.length) {
-          setLinearTickets(existingCache.linearTickets);
+        // Skip re-fetching tickets if returning to same PR with cached data
+        if (isSamePR && existingCache?.tickets.length) {
+          setTickets(existingCache.tickets);
         } else {
-          setLinearLoading(true);
-          setLinearError(null);
+          setTicketsLoading(true);
+          setTicketsError(null);
           const commitMessages = result.commits.map((c) => c.message);
-          invoke<LinearTicket[]>("fetch_linear_tickets", {
+          invoke<Ticket[]>("fetch_tickets", {
+            owner: ownerArg,
+            repo: repoArg,
             title: result.title,
             body: result.body,
             commitMessages,
           })
-            .then(setLinearTickets)
+            .then(setTickets)
             .catch((err) => {
               const msg = String(err);
-              setLinearTickets([]);
-              setLinearError(msg);
+              setTickets([]);
+              setTicketsError(msg);
             })
-            .finally(() => setLinearLoading(false));
+            .finally(() => setTicketsLoading(false));
         }
       } catch (err) {
         setError(String(err));
@@ -170,13 +172,13 @@ export function useReview(options: UseReviewOptions): UseReviewReturn {
   );
 
   const runAiReview = useCallback(
-    async (owner: string, repo: string, prNumber: number) => {
+    async (ownerArg: string, repoArg: string, prNumber: number) => {
       setReviewLoading(true);
       setReviewError(null);
       try {
         const result = await invoke<AiReviewSummary>("run_ai_review", {
-          owner,
-          repo,
+          owner: ownerArg,
+          repo: repoArg,
           prNumber,
         });
         setAiReview(result);
@@ -219,16 +221,16 @@ export function useReview(options: UseReviewOptions): UseReviewReturn {
 
   const mergePR = useCallback(
     async (
-      owner: string,
-      repo: string,
+      ownerArg: string,
+      repoArg: string,
       prNumber: number,
       title: string,
       message: string,
       method: MergeMethod
     ) => {
       await invoke("merge_pull_request", {
-        owner,
-        repo,
+        owner: ownerArg,
+        repo: repoArg,
         prNumber,
         commitTitle: title,
         commitMessage: message,
@@ -241,9 +243,9 @@ export function useReview(options: UseReviewOptions): UseReviewReturn {
   return {
     pr,
     aiReview,
-    linearTickets,
-    linearLoading,
-    linearError,
+    tickets,
+    ticketsLoading,
+    ticketsError,
     selectedCommitIndex,
     hideMerges,
     loading,

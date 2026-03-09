@@ -13,6 +13,9 @@ export function SettingsPage() {
     hasOpenAiKey,
     hasGithubToken,
     hasLinearToken,
+    hasJiraCredentials,
+    jiraDomain,
+    hasAsanaToken,
     ollamaUrl,
     loading,
     changeProvider,
@@ -22,6 +25,9 @@ export function SettingsPage() {
     testConnection,
     saveGithubToken,
     saveLinearToken,
+    saveJiraCredentials,
+    saveJiraDomain,
+    saveAsanaToken,
     saveOllamaUrl,
   } = useSettings();
 
@@ -58,8 +64,14 @@ export function SettingsPage() {
       <AccountSettings
         hasGithubToken={hasGithubToken}
         hasLinearToken={hasLinearToken}
+        hasJiraCredentials={hasJiraCredentials}
+        jiraDomain={jiraDomain}
+        hasAsanaToken={hasAsanaToken}
         onSaveGithubToken={saveGithubToken}
         onSaveLinearToken={saveLinearToken}
+        onSaveJiraCredentials={saveJiraCredentials}
+        onSaveJiraDomain={saveJiraDomain}
+        onSaveAsanaToken={saveAsanaToken}
       />
     </div>
   );

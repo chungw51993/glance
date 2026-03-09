@@ -9,7 +9,7 @@ import { useLayoutPreferences } from "@/hooks/use-layout-preferences";
 import { PrHeader } from "@/components/pr-review/pr-header";
 import { CommitSidebar } from "@/components/pr-review/commit-sidebar";
 import { DiffPane } from "@/components/pr-review/diff-pane";
-import { LinearTicketsPanel } from "@/components/pr-review/linear-tickets-panel";
+import { TicketsPanel } from "@/components/pr-review/tickets-panel";
 import { AiSummaryPanel } from "@/components/pr-review/ai-summary-panel";
 import {
   ResizablePanelGroup,
@@ -54,9 +54,9 @@ export function ReviewPage() {
     error,
     reviewError,
     mergeStatus,
-    linearTickets,
-    linearLoading,
-    linearError,
+    tickets,
+    ticketsLoading,
+    ticketsError,
     diffScope,
     prFiles,
     prFilesLoading,
@@ -287,10 +287,10 @@ export function ReviewPage() {
           )}
         </ResizablePanelGroup>
       </div>
-      <LinearTicketsPanel
-        tickets={linearTickets}
-        loading={linearLoading}
-        error={linearError}
+      <TicketsPanel
+        tickets={tickets}
+        loading={ticketsLoading}
+        error={ticketsError}
         expanded={prefs.linearPanelExpanded}
         onToggleExpanded={() => update("linearPanelExpanded", !prefs.linearPanelExpanded)}
       />

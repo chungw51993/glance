@@ -41,7 +41,7 @@ pub struct ReviewPrompt {
     pub pr_author: String,
     pub base_branch: String,
     pub head_branch: String,
-    pub linear_context: Vec<String>,
+    pub ticket_context: Vec<String>,
     pub diffs: Vec<FileDiffContext>,
 }
 
@@ -99,7 +99,7 @@ mod tests {
             pr_author: "dev".into(),
             base_branch: "main".into(),
             head_branch: "feature/login".into(),
-            linear_context: vec!["CPT-123: Fix SSO login".into()],
+            ticket_context: vec!["CPT-123: Fix SSO login".into()],
             diffs: vec![FileDiffContext {
                 path: "src/auth.rs".into(),
                 patch: "+ fn login() {}".into(),

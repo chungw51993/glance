@@ -167,3 +167,71 @@ pub fn delete_linear_token(app_handle: tauri::AppHandle) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     token_manager::delete_token(&store, TokenType::Linear).map_err(|e| e.to_string())
 }
+
+// --- Jira ---
+
+#[tauri::command]
+pub fn save_jira_credentials(app_handle: tauri::AppHandle, credentials: String) -> Result<(), String> {
+    let store = app_handle
+        .store(token_manager::tokens_store_path())
+        .map_err(|e| e.to_string())?;
+    token_manager::store_token(&store, TokenType::JiraCredentials, &credentials).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn has_jira_credentials(app_handle: tauri::AppHandle) -> bool {
+    let Ok(store) = app_handle.store(token_manager::tokens_store_path()) else {
+        return false;
+    };
+    token_manager::has_token(&store, TokenType::JiraCredentials)
+}
+
+#[tauri::command]
+pub fn delete_jira_credentials(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let store = app_handle
+        .store(token_manager::tokens_store_path())
+        .map_err(|e| e.to_string())?;
+    token_manager::delete_token(&store, TokenType::JiraCredentials).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_jira_domain(app_handle: tauri::AppHandle, domain: String) -> Result<(), String> {
+    let store = app_handle
+        .store(preferences::store_path())
+        .map_err(|e| e.to_string())?;
+    preferences::set_jira_domain(&store, &domain)
+}
+
+#[tauri::command]
+pub fn get_jira_domain(app_handle: tauri::AppHandle) -> Result<String, String> {
+    let store = app_handle
+        .store(preferences::store_path())
+        .map_err(|e| e.to_string())?;
+    Ok(preferences::get_jira_domain(&store))
+}
+
+// --- Asana ---
+
+#[tauri::command]
+pub fn save_asana_token(app_handle: tauri::AppHandle, token: String) -> Result<(), String> {
+    let store = app_handle
+        .store(token_manager::tokens_store_path())
+        .map_err(|e| e.to_string())?;
+    token_manager::store_token(&store, TokenType::Asana, &token).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn has_asana_token(app_handle: tauri::AppHandle) -> bool {
+    let Ok(store) = app_handle.store(token_manager::tokens_store_path()) else {
+        return false;
+    };
+    token_manager::has_token(&store, TokenType::Asana)
+}
+
+#[tauri::command]
+pub fn delete_asana_token(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let store = app_handle
+        .store(token_manager::tokens_store_path())
+        .map_err(|e| e.to_string())?;
+    token_manager::delete_token(&store, TokenType::Asana).map_err(|e| e.to_string())
+}

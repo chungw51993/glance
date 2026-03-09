@@ -11,6 +11,9 @@ export function useSettings() {
   const [hasOpenAiKey, setHasOpenAiKey] = useState(false);
   const [hasGithubToken, setHasGithubToken] = useState(false);
   const [hasLinearToken, setHasLinearToken] = useState(false);
+  const [hasJiraCredentials, setHasJiraCredentials] = useState(false);
+  const [jiraDomain, setJiraDomainState] = useState("");
+  const [hasAsanaToken, setHasAsanaToken] = useState(false);
   const [ollamaUrl, setOllamaUrlState] = useState("http://localhost:11434");
   const [loading, setLoading] = useState(true);
 
@@ -28,16 +31,20 @@ export function useSettings() {
   }, []);
 
   const loadKeyStatus = useCallback(async () => {
-    const [anthropic, openai, github, linear] = await Promise.all([
+    const [anthropic, openai, github, linear, jira, asana] = await Promise.all([
       invoke<boolean>("has_api_key", { providerType: "anthropic" }),
       invoke<boolean>("has_api_key", { providerType: "openai" }),
       invoke<boolean>("has_github_token"),
       invoke<boolean>("has_linear_token"),
+      invoke<boolean>("has_jira_credentials"),
+      invoke<boolean>("has_asana_token"),
     ]);
     setHasAnthropicKey(anthropic);
     setHasOpenAiKey(openai);
     setHasGithubToken(github);
     setHasLinearToken(linear);
+    setHasJiraCredentials(jira);
+    setHasAsanaToken(asana);
   }, []);
 
   const loadOllamaUrl = useCallback(async () => {
@@ -49,11 +56,20 @@ export function useSettings() {
     }
   }, []);
 
+  const loadJiraDomain = useCallback(async () => {
+    try {
+      const domain = await invoke<string>("get_jira_domain");
+      setJiraDomainState(domain);
+    } catch {
+      // default already set
+    }
+  }, []);
+
   useEffect(() => {
-    Promise.all([loadConfig(), loadKeyStatus(), loadOllamaUrl()]).finally(() =>
+    Promise.all([loadConfig(), loadKeyStatus(), loadOllamaUrl(), loadJiraDomain()]).finally(() =>
       setLoading(false)
     );
-  }, [loadConfig, loadKeyStatus, loadOllamaUrl]);
+  }, [loadConfig, loadKeyStatus, loadOllamaUrl, loadJiraDomain]);
 
   const changeProvider = useCallback(
     async (providerType: AiProviderType) => {
@@ -123,6 +139,30 @@ export function useSettings() {
     [loadKeyStatus]
   );
 
+  const saveJiraCredentials = useCallback(
+    async (credentials: string) => {
+      await invoke("save_jira_credentials", { credentials });
+      await loadKeyStatus();
+    },
+    [loadKeyStatus]
+  );
+
+  const saveJiraDomain = useCallback(
+    async (domain: string) => {
+      await invoke("save_jira_domain", { domain });
+      setJiraDomainState(domain);
+    },
+    []
+  );
+
+  const saveAsanaToken = useCallback(
+    async (token: string) => {
+      await invoke("save_asana_token", { token });
+      await loadKeyStatus();
+    },
+    [loadKeyStatus]
+  );
+
   const saveOllamaUrl = useCallback(async (url: string) => {
     await invoke("save_ollama_url", { url });
     setOllamaUrlState(url);
@@ -135,6 +175,9 @@ export function useSettings() {
     hasOpenAiKey,
     hasGithubToken,
     hasLinearToken,
+    hasJiraCredentials,
+    jiraDomain,
+    hasAsanaToken,
     ollamaUrl,
     loading,
     changeProvider,
@@ -144,6 +187,9 @@ export function useSettings() {
     testConnection,
     saveGithubToken,
     saveLinearToken,
+    saveJiraCredentials,
+    saveJiraDomain,
+    saveAsanaToken,
     saveOllamaUrl,
   };
 }

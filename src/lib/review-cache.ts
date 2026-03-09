@@ -2,17 +2,17 @@ import type {
   AiReviewSummary,
   DraftComment,
   FileDiff,
-  LinearTicket,
   MergeStatus,
   PullRequestDetail,
+  Ticket,
 } from "@/types";
 
 export interface ReviewCacheEntry {
   prKey: string;
   pr: PullRequestDetail | null;
   aiReview: AiReviewSummary | null;
-  linearTickets: LinearTicket[];
-  linearError: string | null;
+  tickets: Ticket[];
+  ticketsError: string | null;
   mergeStatus: MergeStatus | null;
   prFiles: FileDiff[];
   selectedCommitIndex: number;
@@ -35,8 +35,8 @@ export function updateReviewCache(partial: Partial<ReviewCacheEntry> & { prKey: 
       prKey,
       pr: null,
       aiReview: null,
-      linearTickets: [],
-      linearError: null,
+      tickets: [],
+      ticketsError: null,
       mergeStatus: null,
       prFiles: [],
       selectedCommitIndex: 0,

@@ -53,7 +53,7 @@ export interface FileDiff {
   patch: string | null;
 }
 
-export interface LinearTicket {
+export interface Ticket {
   id: string;
   identifier: string;
   title: string;
@@ -61,6 +61,7 @@ export interface LinearTicket {
   state: string;
   labels: string[];
   url: string;
+  provider: string;
 }
 
 export interface PullRequestDetail {
@@ -74,7 +75,7 @@ export interface PullRequestDetail {
   created_at: string;
   updated_at: string;
   commits: Commit[];
-  linear_tickets: LinearTicket[];
+  linear_tickets: Ticket[];
 }
 
 export interface AiAnnotation {

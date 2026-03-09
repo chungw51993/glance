@@ -11,6 +11,8 @@ pub enum TokenType {
     Linear,
     AnthropicApiKey,
     OpenAiApiKey,
+    JiraCredentials,
+    Asana,
 }
 
 impl TokenType {
@@ -20,6 +22,8 @@ impl TokenType {
             TokenType::Linear => "linear-pat",
             TokenType::AnthropicApiKey => "anthropic-api-key",
             TokenType::OpenAiApiKey => "openai-api-key",
+            TokenType::JiraCredentials => "jira-credentials",
+            TokenType::Asana => "asana-pat",
         }
     }
 }
@@ -102,6 +106,8 @@ mod tests {
             "anthropic-api-key"
         );
         assert_eq!(TokenType::OpenAiApiKey.store_key(), "openai-api-key");
+        assert_eq!(TokenType::JiraCredentials.store_key(), "jira-credentials");
+        assert_eq!(TokenType::Asana.store_key(), "asana-pat");
     }
 
     #[test]

@@ -21,10 +21,10 @@ describe("review-cache", () => {
 
   it("merges partial updates when key matches", () => {
     updateReviewCache({ prKey: "owner/repo/1", selectedCommitIndex: 3 });
-    updateReviewCache({ prKey: "owner/repo/1", linearError: "oops" });
+    updateReviewCache({ prKey: "owner/repo/1", ticketsError: "oops" });
     const cached = getReviewCache("owner/repo/1");
     expect(cached!.selectedCommitIndex).toBe(3);
-    expect(cached!.linearError).toBe("oops");
+    expect(cached!.ticketsError).toBe("oops");
   });
 
   it("resets to defaults when key changes", () => {

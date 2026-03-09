@@ -22,7 +22,7 @@ pub struct PullRequest {
     pub created_at: String,
     pub updated_at: String,
     pub commits: Vec<Commit>,
-    pub linear_tickets: Vec<super::linear::LinearTicket>,
+    pub linear_tickets: Vec<crate::services::tickets::Ticket>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

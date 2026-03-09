@@ -1,12 +1,12 @@
 use crate::models::github::PullRequest;
-use crate::models::linear::LinearTicket;
 use crate::models::review::{FileDiffContext, ReviewPrompt};
+use crate::services::tickets::Ticket;
 
 const MAX_DIFF_CHARS: usize = 100_000;
 
 /// Build a ReviewPrompt from a PullRequest, collecting diffs from non-merge commits.
 /// Truncates total diff content at MAX_DIFF_CHARS to stay within AI context limits.
-pub fn build_review_prompt(pr: &PullRequest, linear_tickets: &[LinearTicket]) -> ReviewPrompt {
+pub fn build_review_prompt(pr: &PullRequest, tickets: &[Ticket]) -> ReviewPrompt {
     let mut diffs = Vec::new();
     let mut total_chars = 0usize;
 
@@ -31,11 +31,11 @@ pub fn build_review_prompt(pr: &PullRequest, linear_tickets: &[LinearTicket]) ->
         }
     }
 
-    let linear_context: Vec<String> = linear_tickets
+    let ticket_context: Vec<String> = tickets
         .iter()
         .map(|t| {
             let desc = t.description.as_deref().unwrap_or("(no description)");
-            format!("{}: {}\n{}", t.identifier, t.title, desc)
+            format!("[{}] {}: {}\n{}", t.provider, t.identifier, t.title, desc)
         })
         .collect();
 
@@ -44,7 +44,7 @@ pub fn build_review_prompt(pr: &PullRequest, linear_tickets: &[LinearTicket]) ->
         pr_author: pr.author.clone(),
         base_branch: pr.base_branch.clone(),
         head_branch: pr.head_branch.clone(),
-        linear_context,
+        ticket_context,
         diffs,
     }
 }

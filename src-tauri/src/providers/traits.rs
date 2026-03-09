@@ -76,9 +76,9 @@ pub fn build_review_user_message(prompt: &ReviewPrompt) -> String {
         prompt.pr_title, prompt.pr_author, prompt.base_branch, prompt.head_branch
     );
 
-    if !prompt.linear_context.is_empty() {
-        msg.push_str("## Linear Tickets\n");
-        for ctx in &prompt.linear_context {
+    if !prompt.ticket_context.is_empty() {
+        msg.push_str("## Ticket Context\n");
+        for ctx in &prompt.ticket_context {
             msg.push_str(&format!("- {ctx}\n"));
         }
         msg.push('\n');
@@ -131,7 +131,7 @@ mod tests {
             pr_author: "dev".into(),
             base_branch: "main".into(),
             head_branch: "feature/login".into(),
-            linear_context: vec!["CPT-123: Fix SSO login".into()],
+            ticket_context: vec!["[Linear] CPT-123: Fix SSO login".into()],
             diffs: vec![FileDiffContext {
                 path: "src/auth.rs".into(),
                 patch: "+ fn login() {}".into(),
@@ -139,7 +139,7 @@ mod tests {
         };
         let msg = build_review_user_message(&prompt);
         assert!(msg.contains("Fix login"));
-        assert!(msg.contains("CPT-123"));
+        assert!(msg.contains("[Linear] CPT-123"));
         assert!(msg.contains("src/auth.rs"));
         assert!(msg.contains("+ fn login() {}"));
     }
@@ -163,16 +163,16 @@ mod tests {
     }
 
     #[test]
-    fn test_build_user_message_without_linear_context() {
+    fn test_build_user_message_without_ticket_context() {
         let prompt = ReviewPrompt {
             pr_title: "Refactor".into(),
             pr_author: "dev".into(),
             base_branch: "main".into(),
             head_branch: "refactor/cleanup".into(),
-            linear_context: vec![],
+            ticket_context: vec![],
             diffs: vec![],
         };
         let msg = build_review_user_message(&prompt);
-        assert!(!msg.contains("Linear Tickets"));
+        assert!(!msg.contains("Ticket Context"));
     }
 }

@@ -24,6 +24,14 @@ pub fn run() {
             commands::settings::save_linear_token,
             commands::settings::has_linear_token,
             commands::settings::delete_linear_token,
+            commands::settings::save_jira_credentials,
+            commands::settings::has_jira_credentials,
+            commands::settings::delete_jira_credentials,
+            commands::settings::save_jira_domain,
+            commands::settings::get_jira_domain,
+            commands::settings::save_asana_token,
+            commands::settings::has_asana_token,
+            commands::settings::delete_asana_token,
             commands::github::list_repos,
             commands::github::list_open_pull_requests,
             commands::github::list_assigned_prs,
@@ -33,7 +41,7 @@ pub fn run() {
             commands::github::get_pr_merge_status,
             commands::github::merge_pull_request,
             commands::github::get_pr_files,
-            commands::github::fetch_linear_tickets,
+            commands::github::fetch_tickets,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,10 +1,13 @@
 use crate::models::github::{AssignedPullRequest, FileDiff, PullRequest, Repo};
-use crate::models::linear::LinearTicket;
 use crate::models::provider::AiProviderType;
 use crate::models::review::AiReviewSummary;
 use crate::providers::factory::create_provider;
 use crate::services::github::GitHubClient;
-use crate::services::linear::{self, LinearClient};
+use crate::services::tickets::asana::AsanaProvider;
+use crate::services::tickets::github_issues::GitHubIssuesProvider;
+use crate::services::tickets::jira::JiraProvider;
+use crate::services::tickets::linear::LinearProvider;
+use crate::services::tickets::{self, Ticket, TicketProvider};
 use crate::services::{preferences, review, token_manager};
 use crate::services::token_manager::TokenType;
 use serde::{Deserialize, Serialize};
@@ -19,6 +22,72 @@ fn get_token_from_store(
         .store(token_manager::tokens_store_path())
         .map_err(|e| e.to_string())?;
     token_manager::get_token(&store, token_type).map_err(|e| e.to_string())
+}
+
+/// Build all configured ticket providers based on stored tokens.
+fn build_ticket_providers(
+    app_handle: &tauri::AppHandle,
+    owner: &str,
+    repo: &str,
+) -> Vec<Box<dyn TicketProvider>> {
+    let mut providers: Vec<Box<dyn TicketProvider>> = Vec::new();
+
+    if let Ok(token) = get_token_from_store(app_handle, TokenType::Linear) {
+        providers.push(Box::new(LinearProvider::new(token)));
+    }
+    if let Ok(creds) = get_token_from_store(app_handle, TokenType::JiraCredentials) {
+        if let Ok(store) = app_handle.store(preferences::store_path()) {
+            let domain = preferences::get_jira_domain(&store);
+            if !domain.is_empty() {
+                providers.push(Box::new(JiraProvider::new(creds, domain)));
+            }
+        }
+    }
+    if let Ok(token) = get_token_from_store(app_handle, TokenType::GitHub) {
+        providers.push(Box::new(GitHubIssuesProvider::new(
+            token,
+            owner.to_string(),
+            repo.to_string(),
+        )));
+    }
+    if let Ok(token) = get_token_from_store(app_handle, TokenType::Asana) {
+        providers.push(Box::new(AsanaProvider::new(token)));
+    }
+
+    providers
+}
+
+/// Fetch tickets from all configured providers concurrently.
+async fn fetch_all_tickets(
+    providers: &[Box<dyn TicketProvider>],
+    title: &str,
+    body: Option<&str>,
+    commit_messages: &[String],
+) -> Vec<Ticket> {
+    let provider_refs: Vec<&dyn TicketProvider> =
+        providers.iter().map(|p| p.as_ref()).collect();
+    let id_groups = tickets::collect_identifiers(
+        &provider_refs,
+        title,
+        body,
+        commit_messages,
+    );
+
+    if id_groups.is_empty() {
+        return vec![];
+    }
+
+    let mut all_tickets = Vec::new();
+    // Fetch sequentially per provider to avoid lifetime issues with trait objects.
+    // Typical PR has 1-3 providers configured, so this is fast enough.
+    for (idx, ids) in id_groups {
+        match providers[idx].fetch_tickets(&ids).await {
+            Ok(t) => all_tickets.extend(t),
+            Err(e) => eprintln!("Ticket fetch error: {}", e),
+        }
+    }
+
+    all_tickets
 }
 
 #[tauri::command]
@@ -83,26 +152,18 @@ pub async fn run_ai_review(
         .await
         .map_err(|e| e.to_string())?;
 
-    // Best-effort: fetch Linear tickets for AI context. If no token or fetch
-    // fails, proceed with empty context -- the review still runs.
-    let linear_tickets = (|| async {
-        let linear_token = get_token_from_store(&app_handle, TokenType::Linear).ok()?;
-        let commit_messages: Vec<String> = pr.commits.iter().map(|c| c.message.clone()).collect();
-        let identifiers = linear::collect_ticket_identifiers(
-            &pr.title,
-            pr.body.as_deref(),
-            &commit_messages,
-        );
-        if identifiers.is_empty() {
-            return Some(vec![]);
-        }
-        let linear_client = LinearClient::new(linear_token);
-        linear_client.get_tickets_by_identifiers(&identifiers).await.ok()
-    })()
-    .await
-    .unwrap_or_default();
+    // Best-effort: fetch tickets from all configured providers for AI context.
+    let providers = build_ticket_providers(&app_handle, &owner, &repo);
+    let commit_messages: Vec<String> = pr.commits.iter().map(|c| c.message.clone()).collect();
+    let all_tickets = fetch_all_tickets(
+        &providers,
+        &pr.title,
+        pr.body.as_deref(),
+        &commit_messages,
+    )
+    .await;
 
-    let prompt = review::build_review_prompt(&pr, &linear_tickets);
+    let prompt = review::build_review_prompt(&pr, &all_tickets);
 
     let store = app_handle
         .store(preferences::store_path())
@@ -213,36 +274,31 @@ pub async fn get_pr_files(
         .map_err(|e| e.to_string())
 }
 
-/// Extract ticket identifiers from PR title, body, and commit messages,
-/// then fetch their details from Linear.
+/// Fetch tickets from all configured providers for the given PR metadata.
 ///
-/// Returns an error string starting with "NO_TOKEN:" when no Linear token
-/// is configured, so the frontend can show a targeted message.
+/// Returns an error string starting with "NO_TOKEN:" when no ticket provider
+/// tokens are configured, so the frontend can show a targeted message.
 #[tauri::command]
-pub async fn fetch_linear_tickets(
+pub async fn fetch_tickets(
     app_handle: tauri::AppHandle,
+    owner: String,
+    repo: String,
     title: String,
     body: Option<String>,
     commit_messages: Vec<String>,
-) -> Result<Vec<LinearTicket>, String> {
-    let token = match get_token_from_store(&app_handle, TokenType::Linear) {
-        Ok(t) => t,
-        Err(_) => return Err("NO_TOKEN: No Linear API token configured. Add one in Settings to see ticket context.".into()),
-    };
+) -> Result<Vec<Ticket>, String> {
+    let providers = build_ticket_providers(&app_handle, &owner, &repo);
+    if providers.is_empty() {
+        return Err("NO_TOKEN: No ticket provider tokens configured. Add one in Settings to see ticket context.".into());
+    }
 
-    let identifiers = linear::collect_ticket_identifiers(
+    let result = fetch_all_tickets(
+        &providers,
         &title,
         body.as_deref(),
         &commit_messages,
-    );
+    )
+    .await;
 
-    if identifiers.is_empty() {
-        return Ok(vec![]);
-    }
-
-    let client = LinearClient::new(token);
-    client
-        .get_tickets_by_identifiers(&identifiers)
-        .await
-        .map_err(|e| e.to_string())
+    Ok(result)
 }
