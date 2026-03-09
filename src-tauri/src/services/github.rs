@@ -1,5 +1,7 @@
 use crate::commands::github::{MergeStatus, ReviewComment};
-use crate::models::github::{AssignedPullRequest, Commit, FileDiff, FileStatus, PullRequest, Repo};
+use crate::models::github::{
+    AssignedPullRequest, AssignmentSource, Commit, FileDiff, FileStatus, PullRequest, Repo,
+};
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, USER_AGENT};
 use serde::Deserialize;
 use thiserror::Error;
@@ -126,6 +128,25 @@ struct GhSearchItem {
     created_at: String,
     updated_at: String,
     repository_url: String,
+}
+
+#[derive(Deserialize)]
+struct GhTeam {
+    slug: String,
+    name: String,
+    organization: GhOrg,
+}
+
+#[derive(Deserialize)]
+struct GhOrg {
+    login: String,
+}
+
+/// Internal representation of a GitHub team (not exported to frontend).
+struct TeamInfo {
+    slug: String,
+    name: String,
+    org: String,
 }
 
 /// Extract (owner, repo) from a GitHub API repository URL like
@@ -559,15 +580,66 @@ impl GitHubClient {
     }
 
     /// Fetch open pull requests assigned to the authenticated user across all repos.
-    /// Uses the GitHub search API with `assignee:@me`.
+    /// Includes directly assigned PRs, review-requested PRs, and team review-requested PRs.
     pub async fn list_assigned_prs(&self) -> Result<Vec<AssignedPullRequest>, GitHubError> {
+        // 1. Direct assignments + individual review requests
+        let direct_prs = self
+            .search_prs("type:pr+state:open+assignee:@me", AssignmentSource::Direct, None)
+            .await?;
+
+        let review_requested_prs = self
+            .search_prs(
+                "type:pr+state:open+review-requested:@me",
+                AssignmentSource::Direct,
+                None,
+            )
+            .await?;
+
+        // 2. Team review requests (best-effort — requires read:org scope)
+        let team_prs = match self.list_team_review_requested_prs().await {
+            Ok(prs) => prs,
+            Err(GitHubError::Api { status: 403, .. } | GitHubError::Api { status: 404, .. }) => {
+                // Token lacks read:org scope or user has no teams — silently skip
+                vec![]
+            }
+            Err(e) => return Err(e),
+        };
+
+        // 3. Merge and deduplicate (prefer Direct over Team when both exist)
+        let mut seen = std::collections::HashSet::new();
+        let mut merged = Vec::new();
+
+        for pr in direct_prs
+            .into_iter()
+            .chain(review_requested_prs)
+            .chain(team_prs)
+        {
+            let key = format!("{}#{}", pr.repo_full_name, pr.number);
+            if seen.insert(key) {
+                merged.push(pr);
+            }
+        }
+
+        // Sort by updated_at descending
+        merged.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+
+        Ok(merged)
+    }
+
+    /// Search PRs using the GitHub search API with a given query fragment.
+    async fn search_prs(
+        &self,
+        query: &str,
+        source: AssignmentSource,
+        team_name: Option<String>,
+    ) -> Result<Vec<AssignedPullRequest>, GitHubError> {
         let mut all_prs = Vec::new();
         let mut page = 1u32;
 
         loop {
             let url = format!(
-                "{}/search/issues?q=type:pr+state:open+assignee:@me&sort=updated&order=desc&per_page=100&page={}",
-                GITHUB_API_BASE, page
+                "{}/search/issues?q={}&sort=updated&order=desc&per_page=100&page={}",
+                GITHUB_API_BASE, query, page
             );
 
             let result: GhSearchResult = self.get_json(&url).await?;
@@ -586,6 +658,8 @@ impl GitHubClient {
                     state: item.state,
                     created_at: item.created_at,
                     updated_at: item.updated_at,
+                    assignment_source: source.clone(),
+                    team_name: team_name.clone(),
                 });
             }
 
@@ -596,6 +670,77 @@ impl GitHubClient {
         }
 
         Ok(all_prs)
+    }
+
+    /// Fetch teams the authenticated user belongs to, then search for PRs
+    /// with review requests for those teams.
+    async fn list_team_review_requested_prs(
+        &self,
+    ) -> Result<Vec<AssignedPullRequest>, GitHubError> {
+        // Fetch user's teams (requires read:org scope)
+        let teams = self.list_user_teams().await?;
+        if teams.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Query each team individually to preserve team name attribution
+        let mut all_prs = Vec::new();
+        for chunk in teams.chunks(5) {
+            for team in chunk {
+                let single_query = format!(
+                    "type:pr+state:open+team-review-requested:{}/{}",
+                    team.org, team.slug
+                );
+                match self
+                    .search_prs(
+                        &single_query,
+                        AssignmentSource::Team,
+                        Some(team.name.clone()),
+                    )
+                    .await
+                {
+                    Ok(prs) => all_prs.extend(prs),
+                    Err(GitHubError::Api { status: 422, .. }) => {
+                        // Search query validation error — skip this team
+                        continue;
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
+        }
+
+        Ok(all_prs)
+    }
+
+    /// Fetch all teams the authenticated user belongs to.
+    async fn list_user_teams(&self) -> Result<Vec<TeamInfo>, GitHubError> {
+        let mut all_teams = Vec::new();
+        let mut page = 1u32;
+
+        loop {
+            let url = format!(
+                "{}/user/teams?per_page=100&page={}",
+                GITHUB_API_BASE, page
+            );
+
+            let gh_teams: Vec<GhTeam> = self.get_json(&url).await?;
+            let batch_len = gh_teams.len();
+
+            for t in gh_teams {
+                all_teams.push(TeamInfo {
+                    slug: t.slug,
+                    name: t.name,
+                    org: t.organization.login,
+                });
+            }
+
+            if batch_len < 100 {
+                break;
+            }
+            page += 1;
+        }
+
+        Ok(all_teams)
     }
 
     async fn get_json<T: serde::de::DeserializeOwned>(

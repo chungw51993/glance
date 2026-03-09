@@ -7,6 +7,8 @@ export interface Repo {
   updated_at: string;
 }
 
+export type AssignmentSource = "direct" | "team";
+
 export interface AssignedPullRequest {
   repo_owner: string;
   repo_name: string;
@@ -17,6 +19,8 @@ export interface AssignedPullRequest {
   state: string;
   created_at: string;
   updated_at: string;
+  assignment_source: AssignmentSource;
+  team_name: string | null;
 }
 
 export interface PullRequestSummary {

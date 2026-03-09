@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { useAssignedPrs } from "@/hooks/use-assigned-prs";
@@ -12,11 +12,28 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import type { AssignmentSource } from "@/types";
+
+type FilterValue = "all" | AssignmentSource;
 
 export function AssignedPage() {
   const navigate = useNavigate();
   const { prs, loading, error, fetch } = useAssignedPrs();
   const [hasToken, setHasToken] = useState<boolean | null>(null);
+  const [filter, setFilter] = useState<FilterValue>("all");
+
+  const filteredPrs = useMemo(
+    () =>
+      filter === "all"
+        ? prs
+        : prs.filter((pr) => pr.assignment_source === filter),
+    [prs, filter]
+  );
+
+  const teamCount = useMemo(
+    () => prs.filter((pr) => pr.assignment_source === "team").length,
+    [prs]
+  );
 
   useEffect(() => {
     invoke<boolean>("has_github_token").then((has) => {
@@ -65,9 +82,9 @@ export function AssignedPage() {
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b px-6 py-3">
         <div>
-          <h2 className="text-sm font-semibold">Assigned to me</h2>
+          <h2 className="text-sm font-semibold">Assigned to me & my teams</h2>
           <p className="text-xs text-muted-foreground">
-            Open pull requests where you are an assignee
+            Open pull requests where you or your teams are assigned or requested for review
           </p>
         </div>
         <Button
@@ -93,6 +110,27 @@ export function AssignedPage() {
         </Button>
       </div>
 
+      {/* Filter tabs — only show when there are team PRs */}
+      {teamCount > 0 && (
+        <div className="flex items-center gap-1 border-b px-6 py-2">
+          {(["all", "direct", "team"] as const).map((value) => (
+            <Button
+              key={value}
+              variant={filter === value ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setFilter(value)}
+            >
+              {value === "all"
+                ? `All (${prs.length})`
+                : value === "direct"
+                  ? `Direct (${prs.length - teamCount})`
+                  : `Team (${teamCount})`}
+            </Button>
+          ))}
+        </div>
+      )}
+
       {error && (
         <div className="px-6 py-3">
           <p className="text-sm text-destructive">{error}</p>
@@ -113,7 +151,13 @@ export function AssignedPage() {
             </p>
           )}
 
-          {prs.map((pr) => (
+          {!loading && filteredPrs.length === 0 && prs.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              No pull requests match this filter.
+            </p>
+          )}
+
+          {filteredPrs.map((pr) => (
             <Card
               key={`${pr.repo_full_name}/${pr.number}`}
               className="cursor-pointer transition-colors hover:bg-accent/50"
@@ -126,9 +170,14 @@ export function AssignedPage() {
               <CardHeader className="pb-0">
                 <div className="flex items-start justify-between gap-3">
                   <CardTitle className="text-sm">{pr.title}</CardTitle>
-                  <Badge variant="outline" className="shrink-0">
-                    #{pr.number}
-                  </Badge>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {pr.assignment_source === "team" && pr.team_name && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                        {pr.team_name}
+                      </Badge>
+                    )}
+                    <Badge variant="outline">#{pr.number}</Badge>
+                  </div>
                 </div>
                 <CardDescription>
                   <code className="rounded bg-muted px-1 py-0.5 text-xs">

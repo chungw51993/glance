@@ -82,6 +82,13 @@ pub struct Hunk {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AssignmentSource {
+    Direct,
+    Team,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssignedPullRequest {
     pub repo_owner: String,
     pub repo_name: String,
@@ -92,6 +99,8 @@ pub struct AssignedPullRequest {
     pub state: String,
     pub created_at: String,
     pub updated_at: String,
+    pub assignment_source: AssignmentSource,
+    pub team_name: Option<String>,
 }
 
 #[cfg(test)]
