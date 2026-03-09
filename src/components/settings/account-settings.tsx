@@ -9,10 +9,11 @@ interface TokenFieldProps {
   label: string;
   hasToken: boolean;
   placeholder: string;
+  hint?: string;
   onSave: (token: string) => Promise<void>;
 }
 
-function TokenField({ label, hasToken, placeholder, onSave }: TokenFieldProps) {
+function TokenField({ label, hasToken, placeholder, hint, onSave }: TokenFieldProps) {
   const [value, setValue] = useState("");
 
   const handleSave = async () => {
@@ -35,6 +36,9 @@ function TokenField({ label, hasToken, placeholder, onSave }: TokenFieldProps) {
           </Badge>
         )}
       </div>
+      {hint && (
+        <p className="text-xs text-muted-foreground">{hint}</p>
+      )}
       <div className="flex gap-2">
         <Input
           type="password"
@@ -80,6 +84,7 @@ export function AccountSettings({
           label="GitHub Personal Access Token"
           hasToken={hasGithubToken}
           placeholder="ghp_..."
+          hint="Requires repo scope. Add read:org to also see PRs assigned to your teams."
           onSave={onSaveGithubToken}
         />
         <TokenField
