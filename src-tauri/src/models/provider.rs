@@ -14,6 +14,16 @@ impl AiProviderType {
         match self {
             AiProviderType::Anthropic => vec![
                 AiModelInfo {
+                    id: "claude-opus-4-6-20250709".into(),
+                    name: "Claude Opus 4.6".into(),
+                    max_context_tokens: 200_000,
+                },
+                AiModelInfo {
+                    id: "claude-sonnet-4-6-20250514".into(),
+                    name: "Claude Sonnet 4.6".into(),
+                    max_context_tokens: 200_000,
+                },
+                AiModelInfo {
                     id: "claude-sonnet-4-20250514".into(),
                     name: "Claude Sonnet 4".into(),
                     max_context_tokens: 200_000,
@@ -23,13 +33,33 @@ impl AiProviderType {
                     name: "Claude Haiku 4.5".into(),
                     max_context_tokens: 200_000,
                 },
-                AiModelInfo {
-                    id: "claude-opus-4-20250514".into(),
-                    name: "Claude Opus 4".into(),
-                    max_context_tokens: 200_000,
-                },
             ],
             AiProviderType::OpenAi => vec![
+                AiModelInfo {
+                    id: "o3".into(),
+                    name: "o3".into(),
+                    max_context_tokens: 200_000,
+                },
+                AiModelInfo {
+                    id: "o4-mini".into(),
+                    name: "o4-mini".into(),
+                    max_context_tokens: 200_000,
+                },
+                AiModelInfo {
+                    id: "gpt-4.1".into(),
+                    name: "GPT-4.1".into(),
+                    max_context_tokens: 1_047_576,
+                },
+                AiModelInfo {
+                    id: "gpt-4.1-mini".into(),
+                    name: "GPT-4.1 Mini".into(),
+                    max_context_tokens: 1_047_576,
+                },
+                AiModelInfo {
+                    id: "gpt-4.1-nano".into(),
+                    name: "GPT-4.1 Nano".into(),
+                    max_context_tokens: 1_047_576,
+                },
                 AiModelInfo {
                     id: "gpt-4o".into(),
                     name: "GPT-4o".into(),
@@ -99,7 +129,7 @@ impl Default for ProviderConfig {
     fn default() -> Self {
         Self {
             provider_type: AiProviderType::Anthropic,
-            model_id: "claude-sonnet-4-20250514".into(),
+            model_id: "claude-sonnet-4-6-20250514".into(),
         }
     }
 }
@@ -133,13 +163,15 @@ mod tests {
         let models = AiProviderType::Anthropic.default_models();
         assert!(models.len() >= 2);
         assert!(models.iter().any(|m| m.id.contains("sonnet")));
+        assert!(models.iter().any(|m| m.id.contains("opus-4-6")));
     }
 
     #[test]
     fn test_default_models_openai() {
         let models = AiProviderType::OpenAi.default_models();
         assert!(models.len() >= 2);
-        assert!(models.iter().any(|m| m.id.contains("gpt-4o")));
+        assert!(models.iter().any(|m| m.id.contains("gpt-4.1")));
+        assert!(models.iter().any(|m| m.id == "o3"));
     }
 
     #[test]
@@ -154,18 +186,18 @@ mod tests {
     fn test_provider_config_default() {
         let config = ProviderConfig::default();
         assert_eq!(config.provider_type, AiProviderType::Anthropic);
-        assert!(config.model_id.contains("sonnet"));
+        assert!(config.model_id.contains("sonnet-4-6"));
     }
 
     #[test]
     fn test_provider_config_roundtrip() {
         let config = ProviderConfig {
             provider_type: AiProviderType::OpenAi,
-            model_id: "gpt-4o".into(),
+            model_id: "gpt-4.1".into(),
         };
         let json = serde_json::to_string(&config).unwrap();
         let deserialized: ProviderConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.provider_type, AiProviderType::OpenAi);
-        assert_eq!(deserialized.model_id, "gpt-4o");
+        assert_eq!(deserialized.model_id, "gpt-4.1");
     }
 }
