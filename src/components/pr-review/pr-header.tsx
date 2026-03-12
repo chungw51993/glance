@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useImperativeHandle, useState, forwardRef } from "react";
+import { Keyboard } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { MergeMethod, MergeStatus, ReviewEvent } from "@/types";
+import type { CombinedCheckStatus, MergeMethod, MergeStatus, ReviewEvent } from "@/types";
+import { CiStatusIndicator } from "@/components/pr-review/ci-status-indicator";
 
 interface PrHeaderProps {
   title: string;
@@ -36,10 +38,16 @@ interface PrHeaderProps {
   onSubmitReview: (event: ReviewEvent, body: string) => Promise<void>;
   submittingReview: boolean;
   mergeStatus: MergeStatus | null;
+  checkStatus: CombinedCheckStatus | null;
   onMerge: (title: string, message: string, method: MergeMethod) => Promise<void>;
+  onKeyboardShortcuts?: () => void;
 }
 
-export function PrHeader({
+export interface PrHeaderHandle {
+  openSubmitDialog: () => void;
+}
+
+export const PrHeader = forwardRef<PrHeaderHandle, PrHeaderProps>(function PrHeader({
   title,
   number,
   author,
@@ -55,8 +63,10 @@ export function PrHeader({
   onSubmitReview,
   submittingReview,
   mergeStatus,
+  checkStatus,
   onMerge,
-}: PrHeaderProps) {
+  onKeyboardShortcuts,
+}, ref) {
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [reviewEvent, setReviewEvent] = useState<ReviewEvent>("APPROVE");
   const [reviewBody, setReviewBody] = useState("");
@@ -66,6 +76,10 @@ export function PrHeader({
   const [mergeMessage, setMergeMessage] = useState("");
   const [merging, setMerging] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    openSubmitDialog: () => handleOpenReviewDialog("APPROVE"),
+  }));
 
   const handleOpenReviewDialog = (event: ReviewEvent) => {
     setReviewEvent(event);
@@ -122,6 +136,7 @@ export function PrHeader({
               <Badge variant="outline" className="shrink-0">
                 #{number}
               </Badge>
+              {checkStatus && <CiStatusIndicator checkStatus={checkStatus} />}
             </div>
             <p className="text-xs text-muted-foreground">
               {author} wants to merge{" "}
@@ -201,6 +216,18 @@ export function PrHeader({
           >
             Merge
           </Button>
+
+          {onKeyboardShortcuts && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onKeyboardShortcuts}
+              title="Keyboard shortcuts (?)"
+              className="h-8 w-8 p-0"
+            >
+              <Keyboard className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -319,4 +346,4 @@ export function PrHeader({
       </Dialog>
     </div>
   );
-}
+});

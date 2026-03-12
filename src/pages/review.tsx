@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { getReviewCache, updateReviewCache } from "@/lib/review-cache";
@@ -6,9 +6,13 @@ import { invalidatePullRequests, setLastReposPath } from "@/lib/repos-cache";
 import { useReview } from "@/hooks/use-review";
 import { useReviewDraft } from "@/hooks/use-review-draft";
 import { useLayoutPreferences } from "@/hooks/use-layout-preferences";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { PrHeader } from "@/components/pr-review/pr-header";
+import type { PrHeaderHandle } from "@/components/pr-review/pr-header";
+import { KeyboardShortcutsOverlay } from "@/components/keyboard-shortcuts-overlay";
 import { CommitSidebar } from "@/components/pr-review/commit-sidebar";
 import { DiffPane } from "@/components/pr-review/diff-pane";
+import { DescriptionPanel } from "@/components/pr-review/description-panel";
 import { TicketsPanel } from "@/components/pr-review/tickets-panel";
 import { AiSummaryPanel } from "@/components/pr-review/ai-summary-panel";
 import {
@@ -30,6 +34,8 @@ export function ReviewPage() {
 
   const cached = prKey ? getReviewCache(prKey) : null;
   const [aiPanelOpen, setAiPanelOpen] = useState(cached?.aiPanelOpen ?? false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const headerRef = useRef<PrHeaderHandle>(null);
 
   // Register this page as the last repos-area path
   useEffect(() => {
@@ -54,6 +60,7 @@ export function ReviewPage() {
     error,
     reviewError,
     mergeStatus,
+    checkStatus,
     tickets,
     ticketsLoading,
     ticketsError,
@@ -85,6 +92,37 @@ export function ReviewPage() {
     submitReview,
     submitting: submittingReview,
   } = useReviewDraft(prKey);
+
+  useKeyboardShortcuts({
+    nextCommit,
+    prevCommit,
+    toggleFullPrDiff: useCallback(() => {
+      setDiffScope(diffScope === "full-pr" ? "commit" : "full-pr");
+    }, [diffScope, setDiffScope]),
+    toggleSidebar: useCallback(
+      () => update("sidebarCollapsed", !prefs.sidebarCollapsed),
+      [prefs.sidebarCollapsed, update]
+    ),
+    toggleAiPanel: useCallback(
+      () => setAiPanelOpen((prev) => !prev),
+      []
+    ),
+    scrollToNextFile: useCallback(() => {}, []),
+    scrollToPrevFile: useCallback(() => {}, []),
+    runAiReview: useCallback(() => {
+      if (owner && name && prNumber) {
+        runAiReview(owner, name, Number(prNumber));
+      }
+    }, [owner, name, prNumber, runAiReview]),
+    openSubmitDialog: useCallback(() => {
+      headerRef.current?.openSubmitDialog();
+    }, []),
+    toggleShortcutsOverlay: useCallback(
+      () => setShortcutsOpen((prev) => !prev),
+      []
+    ),
+    closeOverlay: useCallback(() => setShortcutsOpen(false), []),
+  });
 
   useEffect(() => {
     if (owner && name && prNumber) {
@@ -174,6 +212,7 @@ export function ReviewPage() {
   return (
     <div className="flex h-full flex-col">
       <PrHeader
+        ref={headerRef}
         title={pr.title}
         number={pr.number}
         author={pr.author}
@@ -197,7 +236,18 @@ export function ReviewPage() {
         onSubmitReview={handleSubmitReview}
         submittingReview={submittingReview}
         mergeStatus={mergeStatus}
+        checkStatus={checkStatus}
         onMerge={handleMerge}
+        onKeyboardShortcuts={() => setShortcutsOpen(true)}
+      />
+      <KeyboardShortcutsOverlay
+        open={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
+      <DescriptionPanel
+        body={pr.body}
+        expanded={prefs.descriptionPanelExpanded}
+        onToggleExpanded={() => update("descriptionPanelExpanded", !prefs.descriptionPanelExpanded)}
       />
       <div className="flex flex-1 overflow-hidden">
         <CommitSidebar

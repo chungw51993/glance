@@ -48,6 +48,7 @@ pub fn run() {
             commands::github::get_pr_merge_status,
             commands::github::merge_pull_request,
             commands::github::get_pr_files,
+            commands::github::get_check_status,
             commands::github::fetch_tickets,
         ])
         .run(tauri::generate_context!())

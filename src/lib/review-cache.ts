@@ -1,5 +1,6 @@
 import type {
   AiReviewSummary,
+  CombinedCheckStatus,
   DraftComment,
   FileDiff,
   MergeStatus,
@@ -14,6 +15,7 @@ export interface ReviewCacheEntry {
   tickets: Ticket[];
   ticketsError: string | null;
   mergeStatus: MergeStatus | null;
+  checkStatus: CombinedCheckStatus | null;
   prFiles: FileDiff[];
   selectedCommitIndex: number;
   draftComments: DraftComment[];
@@ -38,6 +40,7 @@ export function updateReviewCache(partial: Partial<ReviewCacheEntry> & { prKey: 
       tickets: [],
       ticketsError: null,
       mergeStatus: null,
+      checkStatus: null,
       prFiles: [],
       selectedCommitIndex: 0,
       draftComments: [],
