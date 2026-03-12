@@ -124,6 +124,22 @@ export interface PrReviewSubmission {
   comments: DraftComment[];
 }
 
+export interface CheckRun {
+  name: string;
+  status: string;
+  conclusion: string | null;
+  details_url: string | null;
+}
+
+export interface CombinedCheckStatus {
+  state: string;
+  total: number;
+  passed: number;
+  failed: number;
+  pending: number;
+  checks: CheckRun[];
+}
+
 export type MergeMethod = "merge" | "squash" | "rebase";
 
 export interface MergeStatus {

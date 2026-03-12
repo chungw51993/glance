@@ -1,4 +1,4 @@
-use crate::models::github::{AssignedPullRequest, FileDiff, PullRequest, Repo};
+use crate::models::github::{AssignedPullRequest, CombinedCheckStatus, FileDiff, PullRequest, Repo};
 use crate::models::provider::AiProviderType;
 use crate::models::review::AiReviewSummary;
 use crate::providers::factory::create_provider;
@@ -270,6 +270,21 @@ pub async fn get_pr_files(
     let client = GitHubClient::new(token);
     client
         .get_pr_files(&owner, &repo, pr_number)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_check_status(
+    app_handle: tauri::AppHandle,
+    owner: String,
+    repo: String,
+    head_sha: String,
+) -> Result<CombinedCheckStatus, String> {
+    let token = get_token_from_store(&app_handle, TokenType::GitHub)?;
+    let client = GitHubClient::new(token);
+    client
+        .get_check_status(&owner, &repo, &head_sha)
         .await
         .map_err(|e| e.to_string())
 }

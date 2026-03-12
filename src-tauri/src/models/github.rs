@@ -103,6 +103,24 @@ pub struct AssignedPullRequest {
     pub team_name: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CheckRun {
+    pub name: String,
+    pub status: String,
+    pub conclusion: Option<String>,
+    pub details_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CombinedCheckStatus {
+    pub state: String,
+    pub total: usize,
+    pub passed: usize,
+    pub failed: usize,
+    pub pending: usize,
+    pub checks: Vec<CheckRun>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

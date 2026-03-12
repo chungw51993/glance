@@ -55,6 +55,7 @@ interface LayoutPreferences {
   diffViewMode: DiffViewMode;
   hideMerges: boolean;
   linearPanelExpanded: boolean;
+  descriptionPanelExpanded: boolean;
   diffScope: DiffScope;
   codeTheme: CodeTheme;
 }
@@ -65,6 +66,7 @@ const DEFAULTS: LayoutPreferences = {
   diffViewMode: "unified",
   hideMerges: false,
   linearPanelExpanded: true,
+  descriptionPanelExpanded: false,
   diffScope: "commit",
   codeTheme: "auto",
 };

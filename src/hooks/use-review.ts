@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getReviewCache, updateReviewCache } from "@/lib/review-cache";
 import type {
   AiReviewSummary,
+  CombinedCheckStatus,
   Commit,
   FileDiff,
   MergeMethod,
@@ -34,6 +35,7 @@ interface UseReviewReturn {
   error: string | null;
   reviewError: string | null;
   mergeStatus: MergeStatus | null;
+  checkStatus: CombinedCheckStatus | null;
   diffScope: DiffScope;
   prFiles: FileDiff[];
   prFilesLoading: boolean;
@@ -71,6 +73,7 @@ export function useReview(options: UseReviewOptions): UseReviewReturn {
   const [error, setError] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [mergeStatus, setMergeStatus] = useState<MergeStatus | null>(cached?.mergeStatus ?? null);
+  const [checkStatus, setCheckStatus] = useState<CombinedCheckStatus | null>(cached?.checkStatus ?? null);
   const [prFiles, setPrFiles] = useState<FileDiff[]>(cached?.prFiles ?? []);
   const [prFilesLoading, setPrFilesLoading] = useState(false);
 
@@ -87,10 +90,11 @@ export function useReview(options: UseReviewOptions): UseReviewReturn {
       tickets,
       ticketsError,
       mergeStatus,
+      checkStatus,
       prFiles,
       selectedCommitIndex,
     });
-  }, [prKey, pr, aiReview, tickets, ticketsError, mergeStatus, prFiles, selectedCommitIndex]);
+  }, [prKey, pr, aiReview, tickets, ticketsError, mergeStatus, checkStatus, prFiles, selectedCommitIndex]);
 
   const visibleCommits = useMemo(() => {
     if (!pr) return [];
@@ -132,6 +136,20 @@ export function useReview(options: UseReviewOptions): UseReviewReturn {
         })
           .then(setMergeStatus)
           .catch(() => setMergeStatus(null));
+
+        // Fetch CI check status in background
+        const headSha = result.commits.length > 0
+          ? result.commits[result.commits.length - 1].sha
+          : null;
+        if (headSha) {
+          invoke<CombinedCheckStatus>("get_check_status", {
+            owner: ownerArg,
+            repo: repoArg,
+            headSha,
+          })
+            .then(setCheckStatus)
+            .catch(() => setCheckStatus(null));
+        }
 
         // Fetch full PR files (aggregate diff) in background
         setPrFilesLoading(true);
@@ -253,6 +271,7 @@ export function useReview(options: UseReviewOptions): UseReviewReturn {
     error,
     reviewError,
     mergeStatus,
+    checkStatus,
     diffScope,
     prFiles,
     prFilesLoading,

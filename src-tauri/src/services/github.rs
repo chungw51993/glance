@@ -1,6 +1,7 @@
 use crate::commands::github::{MergeStatus, ReviewComment};
 use crate::models::github::{
-    AssignedPullRequest, AssignmentSource, Commit, FileDiff, FileStatus, PullRequest, Repo,
+    AssignedPullRequest, AssignmentSource, CheckRun, CombinedCheckStatus, Commit, FileDiff,
+    FileStatus, PullRequest, Repo,
 };
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, USER_AGENT};
 use serde::Deserialize;
@@ -140,6 +141,19 @@ struct GhTeam {
 #[derive(Deserialize)]
 struct GhOrg {
     login: String,
+}
+
+#[derive(Deserialize)]
+struct GhCheckRunsResponse {
+    check_runs: Vec<GhCheckRun>,
+}
+
+#[derive(Deserialize)]
+struct GhCheckRun {
+    name: String,
+    status: String,
+    conclusion: Option<String>,
+    details_url: Option<String>,
 }
 
 /// Internal representation of a GitHub team (not exported to frontend).
@@ -741,6 +755,74 @@ impl GitHubClient {
         }
 
         Ok(all_teams)
+    }
+
+    /// Fetch CI check status for a given git ref (commit SHA).
+    pub async fn get_check_status(
+        &self,
+        owner: &str,
+        repo: &str,
+        git_ref: &str,
+    ) -> Result<CombinedCheckStatus, GitHubError> {
+        let mut all_check_runs = Vec::new();
+        let mut page = 1u32;
+
+        loop {
+            let url = format!(
+                "{}/repos/{}/{}/commits/{}/check-runs?per_page=100&page={}",
+                GITHUB_API_BASE, owner, repo, git_ref, page
+            );
+            let response: GhCheckRunsResponse = self.get_json(&url).await?;
+            let batch_len = response.check_runs.len();
+            all_check_runs.extend(response.check_runs);
+            if batch_len < 100 {
+                break;
+            }
+            page += 1;
+        }
+
+        let total = all_check_runs.len();
+        let mut passed = 0usize;
+        let mut failed = 0usize;
+        let mut pending = 0usize;
+
+        let checks: Vec<CheckRun> = all_check_runs
+            .into_iter()
+            .map(|cr| {
+                match cr.status.as_str() {
+                    "completed" => match cr.conclusion.as_deref() {
+                        Some("success") | Some("neutral") | Some("skipped") => passed += 1,
+                        Some("failure") | Some("timed_out") | Some("cancelled")
+                        | Some("action_required") => failed += 1,
+                        _ => failed += 1,
+                    },
+                    _ => pending += 1,
+                }
+                CheckRun {
+                    name: cr.name,
+                    status: cr.status,
+                    conclusion: cr.conclusion,
+                    details_url: cr.details_url,
+                }
+            })
+            .collect();
+
+        let state = if failed > 0 {
+            "failure".to_string()
+        } else if pending > 0 {
+            "pending".to_string()
+        } else {
+            "success".to_string()
+        };
+
+        Ok(CombinedCheckStatus {
+            state,
+            total,
+            passed,
+            failed,
+            pending,
+            checks,
+        })
     }
 
     async fn get_json<T: serde::de::DeserializeOwned>(
