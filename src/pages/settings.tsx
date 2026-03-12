@@ -4,6 +4,7 @@ import type { CodeTheme } from "@/hooks/use-layout-preferences";
 import { ProviderSettings } from "@/components/settings/provider-settings";
 import { AccountSettings } from "@/components/settings/account-settings";
 import { AppearanceSettings } from "@/components/settings/appearance-settings";
+import { UpdateSettings } from "@/components/settings/update-settings";
 
 export function SettingsPage() {
   const {
@@ -61,6 +62,7 @@ export function SettingsPage() {
         onTestConnection={testConnection}
         onSaveOllamaUrl={saveOllamaUrl}
       />
+      <UpdateSettings />
       <AccountSettings
         hasGithubToken={hasGithubToken}
         hasLinearToken={hasLinearToken}

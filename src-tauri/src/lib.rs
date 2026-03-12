@@ -8,6 +8,13 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
+        .setup(|app| {
+            #[cfg(desktop)]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::settings::save_api_key,
             commands::settings::has_api_key,
