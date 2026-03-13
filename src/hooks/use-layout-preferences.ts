@@ -56,6 +56,7 @@ interface LayoutPreferences {
   hideMerges: boolean;
   linearPanelExpanded: boolean;
   descriptionPanelExpanded: boolean;
+  fileTreeCollapsed: boolean;
   diffScope: DiffScope;
   codeTheme: CodeTheme;
 }
@@ -67,6 +68,7 @@ const DEFAULTS: LayoutPreferences = {
   hideMerges: false,
   linearPanelExpanded: true,
   descriptionPanelExpanded: false,
+  fileTreeCollapsed: true,
   diffScope: "commit",
   codeTheme: "auto",
 };
