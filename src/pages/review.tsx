@@ -11,6 +11,7 @@ import { PrHeader } from "@/components/pr-review/pr-header";
 import type { PrHeaderHandle } from "@/components/pr-review/pr-header";
 import { KeyboardShortcutsOverlay } from "@/components/keyboard-shortcuts-overlay";
 import { CommitSidebar } from "@/components/pr-review/commit-sidebar";
+import { FileTreeSidebar } from "@/components/pr-review/file-tree-sidebar";
 import { DiffPane } from "@/components/pr-review/diff-pane";
 import { DescriptionPanel } from "@/components/pr-review/description-panel";
 import { TicketsPanel } from "@/components/pr-review/tickets-panel";
@@ -266,6 +267,16 @@ export function ReviewPage() {
           onToggleHideMerges={setHideMerges}
           onToggleCollapsed={() => update("sidebarCollapsed", !prefs.sidebarCollapsed)}
           onSelectFullPr={() => setDiffScope("full-pr")}
+        />
+        <FileTreeSidebar
+          files={diffScope === "full-pr" ? (prFiles ?? []) : (selectedCommit?.files ?? [])}
+          collapsed={prefs.fileTreeCollapsed}
+          aiAnnotations={annotationsForCommit}
+          onToggleCollapsed={() => update("fileTreeCollapsed", !prefs.fileTreeCollapsed)}
+          onSelectFile={(path) => {
+            const el = document.querySelector(`[data-file-path="${path}"]`);
+            if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
         />
         <ResizablePanelGroup orientation="horizontal" className="flex-1">
           <ResizablePanel defaultSize={aiPanelOpen ? 50 : 100} minSize={50}>
