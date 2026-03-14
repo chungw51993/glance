@@ -16,6 +16,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // AI provider settings
             commands::settings::save_api_key,
             commands::settings::has_api_key,
             commands::settings::delete_api_key,
@@ -25,9 +26,7 @@ pub fn run() {
             commands::settings::list_provider_models,
             commands::settings::save_ollama_url,
             commands::settings::get_ollama_url,
-            commands::settings::save_github_token,
-            commands::settings::has_github_token,
-            commands::settings::delete_github_token,
+            // Ticket provider settings
             commands::settings::save_linear_token,
             commands::settings::has_linear_token,
             commands::settings::delete_linear_token,
@@ -39,18 +38,26 @@ pub fn run() {
             commands::settings::save_asana_token,
             commands::settings::has_asana_token,
             commands::settings::delete_asana_token,
-            commands::github::get_authenticated_user,
-            commands::github::list_repos,
-            commands::github::list_open_pull_requests,
-            commands::github::list_assigned_prs,
-            commands::github::get_pull_request_detail,
-            commands::github::run_ai_review,
-            commands::github::submit_pr_review,
-            commands::github::get_pr_merge_status,
-            commands::github::merge_pull_request,
-            commands::github::get_pr_files,
-            commands::github::get_check_status,
-            commands::github::fetch_tickets,
+            // Git provider settings
+            commands::git_provider::get_git_provider_type,
+            commands::git_provider::set_git_provider_type,
+            commands::git_provider::save_git_token,
+            commands::git_provider::has_git_provider_token,
+            commands::git_provider::delete_git_token,
+            commands::git_provider::has_git_token,
+            // Git provider operations
+            commands::git_provider::get_authenticated_user,
+            commands::git_provider::list_repos,
+            commands::git_provider::list_open_pull_requests,
+            commands::git_provider::list_assigned_prs,
+            commands::git_provider::get_pull_request_detail,
+            commands::git_provider::run_ai_review,
+            commands::git_provider::submit_pr_review,
+            commands::git_provider::get_pr_merge_status,
+            commands::git_provider::merge_pull_request,
+            commands::git_provider::get_pr_files,
+            commands::git_provider::get_check_status,
+            commands::git_provider::fetch_tickets,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

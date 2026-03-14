@@ -36,7 +36,7 @@ export function AssignedPage() {
   );
 
   useEffect(() => {
-    invoke<boolean>("has_github_token").then((has) => {
+    invoke<boolean>("has_git_token").then((has) => {
       setHasToken(has);
       if (has) {
         fetch();
@@ -69,7 +69,7 @@ export function AssignedPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <p className="text-sm text-muted-foreground">
-          Connect your GitHub account in Settings to view assigned PRs.
+          Connect your git provider account in Settings to view assigned PRs.
         </p>
         <Button variant="outline" onClick={() => navigate("/settings")}>
           Go to Settings

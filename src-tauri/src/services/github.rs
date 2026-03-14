@@ -1,4 +1,4 @@
-use crate::commands::github::{MergeStatus, ReviewComment};
+use crate::commands::git_provider::{MergeStatus, ReviewComment};
 use crate::models::github::{
     AssignedPullRequest, AssignmentSource, CheckRun, CombinedCheckStatus, Commit, FileDiff,
     FileStatus, PullRequest, Repo,
@@ -878,6 +878,126 @@ impl GitHubClient {
         }
 
         Ok(resp.json().await?)
+    }
+}
+
+// --- GitHubProvider: trait implementation wrapping GitHubClient ---
+
+use crate::services::git_provider::{GitProvider, GitProviderError};
+use async_trait::async_trait;
+
+pub struct GitHubProvider {
+    client: GitHubClient,
+}
+
+impl GitHubProvider {
+    pub fn new(token: String) -> Self {
+        Self {
+            client: GitHubClient::new(token),
+        }
+    }
+}
+
+impl From<GitHubError> for GitProviderError {
+    fn from(err: GitHubError) -> Self {
+        match err {
+            GitHubError::Request(e) => GitProviderError::Request(e),
+            GitHubError::Api { status, message } => GitProviderError::Api { status, message },
+            GitHubError::NoToken => GitProviderError::NoToken,
+        }
+    }
+}
+
+#[async_trait]
+impl GitProvider for GitHubProvider {
+    fn name(&self) -> &str {
+        "GitHub"
+    }
+
+    async fn get_authenticated_user(&self) -> Result<String, GitProviderError> {
+        Ok(self.client.get_authenticated_user().await?)
+    }
+
+    async fn list_repos(&self) -> Result<Vec<Repo>, GitProviderError> {
+        Ok(self.client.list_repos().await?)
+    }
+
+    async fn list_open_pull_requests(
+        &self,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Vec<PullRequest>, GitProviderError> {
+        Ok(self.client.list_open_pull_requests(owner, repo).await?)
+    }
+
+    async fn list_assigned_prs(&self) -> Result<Vec<AssignedPullRequest>, GitProviderError> {
+        Ok(self.client.list_assigned_prs().await?)
+    }
+
+    async fn get_pr_detail(
+        &self,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+    ) -> Result<PullRequest, GitProviderError> {
+        Ok(self.client.get_pr_detail(owner, repo, pr_number).await?)
+    }
+
+    async fn submit_review(
+        &self,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+        event: &str,
+        body: &str,
+        comments: &[ReviewComment],
+    ) -> Result<(), GitProviderError> {
+        Ok(self
+            .client
+            .submit_review(owner, repo, pr_number, event, body, comments)
+            .await?)
+    }
+
+    async fn get_merge_status(
+        &self,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+    ) -> Result<MergeStatus, GitProviderError> {
+        Ok(self.client.get_merge_status(owner, repo, pr_number).await?)
+    }
+
+    async fn merge_pr(
+        &self,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+        commit_title: &str,
+        commit_message: &str,
+        merge_method: &str,
+    ) -> Result<(), GitProviderError> {
+        Ok(self
+            .client
+            .merge_pr(owner, repo, pr_number, commit_title, commit_message, merge_method)
+            .await?)
+    }
+
+    async fn get_pr_files(
+        &self,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+    ) -> Result<Vec<FileDiff>, GitProviderError> {
+        Ok(self.client.get_pr_files(owner, repo, pr_number).await?)
+    }
+
+    async fn get_check_status(
+        &self,
+        owner: &str,
+        repo: &str,
+        git_ref: &str,
+    ) -> Result<CombinedCheckStatus, GitProviderError> {
+        Ok(self.client.get_check_status(owner, repo, git_ref).await?)
     }
 }
 

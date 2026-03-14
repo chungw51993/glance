@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { GitProviderType } from "@/types";
 
 interface TokenFieldProps {
   label: string;
@@ -19,9 +20,10 @@ interface TokenFieldProps {
   hint?: string;
   type?: string;
   onSave: (token: string) => Promise<void>;
+  onDelete?: () => Promise<void>;
 }
 
-function TokenField({ label, hasToken, placeholder, hint, type = "password", onSave }: TokenFieldProps) {
+function TokenField({ label, hasToken, placeholder, hint, type = "password", onSave, onDelete }: TokenFieldProps) {
   const [value, setValue] = useState("");
 
   const handleSave = async () => {
@@ -64,18 +66,67 @@ function TokenField({ label, hasToken, placeholder, hint, type = "password", onS
         >
           Save
         </Button>
+        {hasToken && onDelete && (
+          <Button
+            variant="outline"
+            onClick={onDelete}
+          >
+            Remove
+          </Button>
+        )}
       </div>
     </div>
   );
 }
 
+// --- Git Provider ---
+
+interface GitProviderInfo {
+  key: GitProviderType;
+  label: string;
+  placeholder: string;
+  hint: string;
+  comingSoon: boolean;
+}
+
+const gitProviders: GitProviderInfo[] = [
+  {
+    key: "git_hub",
+    label: "GitHub",
+    placeholder: "ghp_...",
+    hint: "Requires repo scope. Add read:org to also see PRs assigned to your teams.",
+    comingSoon: false,
+  },
+  {
+    key: "git_lab",
+    label: "GitLab",
+    placeholder: "glpat-...",
+    hint: "Requires api scope. Generate from Settings > Access Tokens in GitLab.",
+    comingSoon: true,
+  },
+  {
+    key: "bitbucket",
+    label: "Bitbucket",
+    placeholder: "ATBB...",
+    hint: "Create an App Password with Repositories and Pull Requests permissions.",
+    comingSoon: true,
+  },
+];
+
+// --- Ticket Provider ---
+
 interface AccountSettingsProps {
-  hasGithubToken: boolean;
+  gitProviderType: GitProviderType;
+  hasGitHubToken: boolean;
+  hasGitLabToken: boolean;
+  hasBitbucketToken: boolean;
   hasLinearToken: boolean;
   hasJiraCredentials: boolean;
   jiraDomain: string;
   hasAsanaToken: boolean;
-  onSaveGithubToken: (token: string) => Promise<void>;
+  onChangeGitProvider: (provider: GitProviderType) => Promise<void>;
+  onSaveGitToken: (provider: GitProviderType, token: string) => Promise<void>;
+  onDeleteGitToken: (provider: GitProviderType) => Promise<void>;
   onSaveLinearToken: (token: string) => Promise<void>;
   onSaveJiraCredentials: (credentials: string) => Promise<void>;
   onSaveJiraDomain: (domain: string) => Promise<void>;
@@ -157,44 +208,89 @@ function TicketProviderFields({
 }
 
 export function AccountSettings({
-  hasGithubToken,
+  gitProviderType,
+  hasGitHubToken,
+  hasGitLabToken,
+  hasBitbucketToken,
   hasLinearToken,
   hasJiraCredentials,
   jiraDomain,
   hasAsanaToken,
-  onSaveGithubToken,
+  onChangeGitProvider,
+  onSaveGitToken,
+  onDeleteGitToken,
   onSaveLinearToken,
   onSaveJiraCredentials,
   onSaveJiraDomain,
   onSaveAsanaToken,
 }: AccountSettingsProps) {
-  const [selectedProvider, setSelectedProvider] = useState<TicketProviderKey>("linear");
+  const [selectedTicketProvider, setSelectedTicketProvider] = useState<TicketProviderKey>("linear");
 
-  const configuredCount = [hasLinearToken, hasJiraCredentials, hasAsanaToken].filter(Boolean).length;
+  const configuredTicketCount = [hasLinearToken, hasJiraCredentials, hasAsanaToken].filter(Boolean).length;
+
+  const currentGitProvider = gitProviders.find((p) => p.key === gitProviderType) ?? gitProviders[0];
+
+  const hasTokenForProvider = (key: GitProviderType): boolean => {
+    switch (key) {
+      case "git_hub": return hasGitHubToken;
+      case "git_lab": return hasGitLabToken;
+      case "bitbucket": return hasBitbucketToken;
+    }
+  };
 
   return (
     <>
       <Card>
         <CardHeader>
-          <CardTitle>GitHub</CardTitle>
+          <CardTitle>Git Provider</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Provider</Label>
+            <Select value={gitProviderType} onValueChange={(v) => onChangeGitProvider(v as GitProviderType)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {gitProviders.map((p) => (
+                  <SelectItem key={p.key} value={p.key}>
+                    <div className="flex items-center gap-2">
+                      {p.label}
+                      {p.comingSoon && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0">
+                          Coming soon
+                        </Badge>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <TokenField
             label="Personal Access Token"
-            hasToken={hasGithubToken}
-            placeholder="ghp_..."
-            hint="Requires repo scope. Add read:org to also see PRs assigned to your teams."
-            onSave={onSaveGithubToken}
+            hasToken={hasTokenForProvider(gitProviderType)}
+            placeholder={currentGitProvider.placeholder}
+            hint={currentGitProvider.hint}
+            onSave={(token) => onSaveGitToken(gitProviderType, token)}
+            onDelete={() => onDeleteGitToken(gitProviderType)}
           />
+
+          {currentGitProvider.comingSoon && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              {currentGitProvider.label} integration is coming soon. You can save your token now and it will be ready when support is added.
+            </p>
+          )}
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <CardTitle>Ticket Providers</CardTitle>
-            {configuredCount > 0 && (
+            {configuredTicketCount > 0 && (
               <Badge variant="secondary" className="text-xs">
-                {configuredCount} configured
+                {configuredTicketCount} configured
               </Badge>
             )}
           </div>
@@ -202,7 +298,7 @@ export function AccountSettings({
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Provider</Label>
-            <Select value={selectedProvider} onValueChange={(v) => setSelectedProvider(v as TicketProviderKey)}>
+            <Select value={selectedTicketProvider} onValueChange={(v) => setSelectedTicketProvider(v as TicketProviderKey)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -216,7 +312,7 @@ export function AccountSettings({
             </Select>
           </div>
           <TicketProviderFields
-            provider={selectedProvider}
+            provider={selectedTicketProvider}
             hasLinearToken={hasLinearToken}
             hasJiraCredentials={hasJiraCredentials}
             jiraDomain={jiraDomain}

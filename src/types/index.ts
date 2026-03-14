@@ -146,3 +146,5 @@ export interface MergeStatus {
   mergeable: boolean;
   mergeable_state: string;
 }
+
+export type GitProviderType = "git_hub" | "git_lab" | "bitbucket";

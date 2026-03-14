@@ -52,7 +52,7 @@ export function ReposPage() {
   }, [selectedRepo, loadingPRs, fetchPullRequests]);
 
   useEffect(() => {
-    invoke<boolean>("has_github_token").then((has) => {
+    invoke<boolean>("has_git_token").then((has) => {
       setHasToken(has);
       if (has && repos.length === 0) {
         fetchRepos();
@@ -94,7 +94,7 @@ export function ReposPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <p className="text-sm text-muted-foreground">
-          Connect your GitHub account in Settings to view repositories.
+          Connect your git provider account in Settings to view repositories.
         </p>
         <Button variant="outline" onClick={() => navigate("/settings")}>
           Go to Settings

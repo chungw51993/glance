@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
-import type { AiModelInfo, AiProviderType, ProviderConfig } from "@/types";
+import type { AiModelInfo, AiProviderType, GitProviderType, ProviderConfig } from "@/types";
 
 export function useSettings() {
   const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(
@@ -9,7 +9,10 @@ export function useSettings() {
   const [models, setModels] = useState<AiModelInfo[]>([]);
   const [hasAnthropicKey, setHasAnthropicKey] = useState(false);
   const [hasOpenAiKey, setHasOpenAiKey] = useState(false);
-  const [hasGithubToken, setHasGithubToken] = useState(false);
+  const [gitProviderType, setGitProviderTypeState] = useState<GitProviderType>("git_hub");
+  const [hasGitHubToken, setHasGitHubToken] = useState(false);
+  const [hasGitLabToken, setHasGitLabToken] = useState(false);
+  const [hasBitbucketToken, setHasBitbucketToken] = useState(false);
   const [hasLinearToken, setHasLinearToken] = useState(false);
   const [hasJiraCredentials, setHasJiraCredentials] = useState(false);
   const [jiraDomain, setJiraDomainState] = useState("");
@@ -31,20 +34,33 @@ export function useSettings() {
   }, []);
 
   const loadKeyStatus = useCallback(async () => {
-    const [anthropic, openai, github, linear, jira, asana] = await Promise.all([
+    const [anthropic, openai, github, gitlab, bitbucket, linear, jira, asana] = await Promise.all([
       invoke<boolean>("has_api_key", { providerType: "anthropic" }),
       invoke<boolean>("has_api_key", { providerType: "openai" }),
-      invoke<boolean>("has_github_token"),
+      invoke<boolean>("has_git_provider_token", { providerType: "git_hub" }),
+      invoke<boolean>("has_git_provider_token", { providerType: "git_lab" }),
+      invoke<boolean>("has_git_provider_token", { providerType: "bitbucket" }),
       invoke<boolean>("has_linear_token"),
       invoke<boolean>("has_jira_credentials"),
       invoke<boolean>("has_asana_token"),
     ]);
     setHasAnthropicKey(anthropic);
     setHasOpenAiKey(openai);
-    setHasGithubToken(github);
+    setHasGitHubToken(github);
+    setHasGitLabToken(gitlab);
+    setHasBitbucketToken(bitbucket);
     setHasLinearToken(linear);
     setHasJiraCredentials(jira);
     setHasAsanaToken(asana);
+  }, []);
+
+  const loadGitProviderType = useCallback(async () => {
+    try {
+      const pt = await invoke<GitProviderType>("get_git_provider_type");
+      setGitProviderTypeState(pt);
+    } catch {
+      // default already set
+    }
   }, []);
 
   const loadOllamaUrl = useCallback(async () => {
@@ -66,10 +82,14 @@ export function useSettings() {
   }, []);
 
   useEffect(() => {
-    Promise.all([loadConfig(), loadKeyStatus(), loadOllamaUrl(), loadJiraDomain()]).finally(() =>
-      setLoading(false)
-    );
-  }, [loadConfig, loadKeyStatus, loadOllamaUrl, loadJiraDomain]);
+    Promise.all([
+      loadConfig(),
+      loadKeyStatus(),
+      loadGitProviderType(),
+      loadOllamaUrl(),
+      loadJiraDomain(),
+    ]).finally(() => setLoading(false));
+  }, [loadConfig, loadKeyStatus, loadGitProviderType, loadOllamaUrl, loadJiraDomain]);
 
   const changeProvider = useCallback(
     async (providerType: AiProviderType) => {
@@ -123,9 +143,25 @@ export function useSettings() {
     []
   );
 
-  const saveGithubToken = useCallback(
-    async (token: string) => {
-      await invoke("save_github_token", { token });
+  const changeGitProvider = useCallback(
+    async (providerType: GitProviderType) => {
+      await invoke("set_git_provider_type", { providerType });
+      setGitProviderTypeState(providerType);
+    },
+    []
+  );
+
+  const saveGitToken = useCallback(
+    async (providerType: GitProviderType, token: string) => {
+      await invoke("save_git_token", { providerType, token });
+      await loadKeyStatus();
+    },
+    [loadKeyStatus]
+  );
+
+  const deleteGitToken = useCallback(
+    async (providerType: GitProviderType) => {
+      await invoke("delete_git_token", { providerType });
       await loadKeyStatus();
     },
     [loadKeyStatus]
@@ -173,7 +209,10 @@ export function useSettings() {
     models,
     hasAnthropicKey,
     hasOpenAiKey,
-    hasGithubToken,
+    gitProviderType,
+    hasGitHubToken,
+    hasGitLabToken,
+    hasBitbucketToken,
     hasLinearToken,
     hasJiraCredentials,
     jiraDomain,
@@ -185,7 +224,9 @@ export function useSettings() {
     saveApiKey,
     deleteApiKey,
     testConnection,
-    saveGithubToken,
+    changeGitProvider,
+    saveGitToken,
+    deleteGitToken,
     saveLinearToken,
     saveJiraCredentials,
     saveJiraDomain,
