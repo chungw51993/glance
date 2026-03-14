@@ -39,6 +39,7 @@ pub fn run() {
             commands::settings::save_asana_token,
             commands::settings::has_asana_token,
             commands::settings::delete_asana_token,
+            commands::github::get_authenticated_user,
             commands::github::list_repos,
             commands::github::list_open_pull_requests,
             commands::github::list_assigned_prs,

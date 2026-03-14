@@ -230,6 +230,36 @@ impl GitHubClient {
         Self { http, token }
     }
 
+    /// Fetch the authenticated user's login.
+    pub async fn get_authenticated_user(&self) -> Result<String, GitHubError> {
+        let url = format!("{}/user", GITHUB_API_BASE);
+        let resp = self
+            .http
+            .get(&url)
+            .header(AUTHORIZATION, format!("Bearer {}", self.token))
+            .header(USER_AGENT, APP_USER_AGENT)
+            .header(ACCEPT, "application/vnd.github+json")
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(GitHubError::Api {
+                status,
+                message: body,
+            });
+        }
+
+        #[derive(Deserialize)]
+        struct User {
+            login: String,
+        }
+
+        let user: User = resp.json().await?;
+        Ok(user.login)
+    }
+
     /// Fetch all repositories the authenticated user has access to.
     /// Uses the /user/repos endpoint with affiliation=owner,collaborator,organization_member
     /// and paginates through all results.

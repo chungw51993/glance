@@ -7,6 +7,7 @@ import { useReview } from "@/hooks/use-review";
 import { useReviewDraft } from "@/hooks/use-review-draft";
 import { useLayoutPreferences } from "@/hooks/use-layout-preferences";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { PrHeader } from "@/components/pr-review/pr-header";
 import type { PrHeaderHandle } from "@/components/pr-review/pr-header";
 import { KeyboardShortcutsOverlay } from "@/components/keyboard-shortcuts-overlay";
@@ -28,6 +29,7 @@ export function ReviewPage() {
   const { owner, name, prNumber } = useParams();
   const navigate = useNavigate();
   const { prefs, update } = useLayoutPreferences();
+  const currentUser = useCurrentUser();
 
   const prKey = owner && name && prNumber
     ? `${owner}/${name}/${prNumber}`
@@ -217,6 +219,7 @@ export function ReviewPage() {
         title={pr.title}
         number={pr.number}
         author={pr.author}
+        currentUser={currentUser}
         headBranch={pr.head_branch}
         baseBranch={pr.base_branch}
         onRefresh={() => {
