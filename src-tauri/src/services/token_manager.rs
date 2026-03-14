@@ -8,6 +8,8 @@ const TOKENS_STORE_FILE: &str = "tokens.json";
 #[serde(rename_all = "snake_case")]
 pub enum TokenType {
     GitHub,
+    GitLab,
+    Bitbucket,
     Linear,
     AnthropicApiKey,
     OpenAiApiKey,
@@ -19,6 +21,8 @@ impl TokenType {
     pub fn store_key(&self) -> &'static str {
         match self {
             TokenType::GitHub => "github-pat",
+            TokenType::GitLab => "gitlab-pat",
+            TokenType::Bitbucket => "bitbucket-pat",
             TokenType::Linear => "linear-pat",
             TokenType::AnthropicApiKey => "anthropic-api-key",
             TokenType::OpenAiApiKey => "openai-api-key",

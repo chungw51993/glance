@@ -25,7 +25,10 @@ export function SettingsPage() {
     models,
     hasAnthropicKey,
     hasOpenAiKey,
-    hasGithubToken,
+    gitProviderType,
+    hasGitHubToken,
+    hasGitLabToken,
+    hasBitbucketToken,
     hasLinearToken,
     hasJiraCredentials,
     jiraDomain,
@@ -37,7 +40,9 @@ export function SettingsPage() {
     saveApiKey,
     deleteApiKey,
     testConnection,
-    saveGithubToken,
+    changeGitProvider,
+    saveGitToken,
+    deleteGitToken,
     saveLinearToken,
     saveJiraCredentials,
     saveJiraDomain,
@@ -103,12 +108,17 @@ export function SettingsPage() {
           )}
           {activeTab === "accounts" && (
             <AccountSettings
-              hasGithubToken={hasGithubToken}
+              gitProviderType={gitProviderType}
+              hasGitHubToken={hasGitHubToken}
+              hasGitLabToken={hasGitLabToken}
+              hasBitbucketToken={hasBitbucketToken}
               hasLinearToken={hasLinearToken}
               hasJiraCredentials={hasJiraCredentials}
               jiraDomain={jiraDomain}
               hasAsanaToken={hasAsanaToken}
-              onSaveGithubToken={saveGithubToken}
+              onChangeGitProvider={changeGitProvider}
+              onSaveGitToken={saveGitToken}
+              onDeleteGitToken={deleteGitToken}
               onSaveLinearToken={saveLinearToken}
               onSaveJiraCredentials={saveJiraCredentials}
               onSaveJiraDomain={saveJiraDomain}

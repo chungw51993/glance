@@ -1,10 +1,12 @@
 use crate::models::provider::ProviderConfig;
+use crate::services::git_provider::GitProviderType;
 use tauri_plugin_store::Store;
 
 const STORE_FILE: &str = "settings.json";
 const PROVIDER_CONFIG_KEY: &str = "provider_config";
 const OLLAMA_URL_KEY: &str = "ollama_url";
 const JIRA_DOMAIN_KEY: &str = "jira_domain";
+const GIT_PROVIDER_TYPE_KEY: &str = "git_provider_type";
 
 pub fn get_provider_config<R: tauri::Runtime>(store: &Store<R>) -> ProviderConfig {
     store
@@ -49,6 +51,22 @@ pub fn set_jira_domain<R: tauri::Runtime>(
     domain: &str,
 ) -> Result<(), String> {
     store.set(JIRA_DOMAIN_KEY, serde_json::Value::String(domain.to_string()));
+    store.save().map_err(|e| e.to_string())
+}
+
+pub fn get_git_provider_type<R: tauri::Runtime>(store: &Store<R>) -> GitProviderType {
+    store
+        .get(GIT_PROVIDER_TYPE_KEY)
+        .and_then(|v| serde_json::from_value(v).ok())
+        .unwrap_or_default()
+}
+
+pub fn set_git_provider_type<R: tauri::Runtime>(
+    store: &Store<R>,
+    provider_type: &GitProviderType,
+) -> Result<(), String> {
+    let value = serde_json::to_value(provider_type).map_err(|e| e.to_string())?;
+    store.set(GIT_PROVIDER_TYPE_KEY, value);
     store.save().map_err(|e| e.to_string())
 }
 

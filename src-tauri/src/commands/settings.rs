@@ -121,30 +121,6 @@ pub fn get_ollama_url(app_handle: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn save_github_token(app_handle: tauri::AppHandle, token: String) -> Result<(), String> {
-    let store = app_handle
-        .store(token_manager::tokens_store_path())
-        .map_err(|e| e.to_string())?;
-    token_manager::store_token(&store, TokenType::GitHub, &token).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn has_github_token(app_handle: tauri::AppHandle) -> bool {
-    let Ok(store) = app_handle.store(token_manager::tokens_store_path()) else {
-        return false;
-    };
-    token_manager::has_token(&store, TokenType::GitHub)
-}
-
-#[tauri::command]
-pub fn delete_github_token(app_handle: tauri::AppHandle) -> Result<(), String> {
-    let store = app_handle
-        .store(token_manager::tokens_store_path())
-        .map_err(|e| e.to_string())?;
-    token_manager::delete_token(&store, TokenType::GitHub).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 pub fn save_linear_token(app_handle: tauri::AppHandle, token: String) -> Result<(), String> {
     let store = app_handle
         .store(token_manager::tokens_store_path())
