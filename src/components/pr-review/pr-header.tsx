@@ -26,6 +26,7 @@ interface PrHeaderProps {
   title: string;
   number: number;
   author: string;
+  currentUser: string | null;
   headBranch: string;
   baseBranch: string;
   onRefresh: () => void;
@@ -51,6 +52,7 @@ export const PrHeader = forwardRef<PrHeaderHandle, PrHeaderProps>(function PrHea
   title,
   number,
   author,
+  currentUser,
   headBranch,
   baseBranch,
   onRefresh,
@@ -122,6 +124,19 @@ export const PrHeader = forwardRef<PrHeaderHandle, PrHeaderProps>(function PrHea
     COMMENT: "Comment",
   };
 
+  const isOwnPr = currentUser != null && currentUser.toLowerCase() === author.toLowerCase();
+  const isMergeBlocked =
+    mergeStatus != null && !mergeStatus.mergeable;
+  const checksBlocking =
+    checkStatus != null && checkStatus.state === "failure";
+
+  const mergeDisabled = isMergeBlocked || checksBlocking;
+  const mergeTooltip = isMergeBlocked
+    ? `Merge blocked: ${mergeStatus?.mergeable_state ?? "not mergeable"}`
+    : checksBlocking
+      ? "Merge blocked: CI checks have failed"
+      : "Merge pull request";
+
   return (
     <div className="shrink-0 border-b bg-background">
       <div className="flex items-center justify-between px-6 py-3">
@@ -192,7 +207,8 @@ export const PrHeader = forwardRef<PrHeaderHandle, PrHeaderProps>(function PrHea
               size="sm"
               variant="outline"
               onClick={() => handleOpenReviewDialog("APPROVE")}
-              disabled={submittingReview}
+              disabled={submittingReview || isOwnPr}
+              title={isOwnPr ? "You cannot review your own pull request" : "Submit review"}
             >
               Submit Review
               {pendingCommentCount > 0 && (
@@ -207,12 +223,8 @@ export const PrHeader = forwardRef<PrHeaderHandle, PrHeaderProps>(function PrHea
           <Button
             size="sm"
             onClick={handleOpenMergeDialog}
-            disabled={mergeStatus !== null && !mergeStatus.mergeable}
-            title={
-              mergeStatus && !mergeStatus.mergeable
-                ? `Not mergeable: ${mergeStatus.mergeable_state}`
-                : "Merge pull request"
-            }
+            disabled={mergeDisabled}
+            title={mergeTooltip}
           >
             Merge
           </Button>
@@ -248,8 +260,8 @@ export const PrHeader = forwardRef<PrHeaderHandle, PrHeaderProps>(function PrHea
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="APPROVE">Approve</SelectItem>
-                  <SelectItem value="REQUEST_CHANGES">Request Changes</SelectItem>
+                  {!isOwnPr && <SelectItem value="APPROVE">Approve</SelectItem>}
+                  {!isOwnPr && <SelectItem value="REQUEST_CHANGES">Request Changes</SelectItem>}
                   <SelectItem value="COMMENT">Comment</SelectItem>
                 </SelectContent>
               </Select>

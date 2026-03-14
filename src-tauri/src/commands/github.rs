@@ -91,6 +91,13 @@ async fn fetch_all_tickets(
 }
 
 #[tauri::command]
+pub async fn get_authenticated_user(app_handle: tauri::AppHandle) -> Result<String, String> {
+    let token = get_token_from_store(&app_handle, TokenType::GitHub)?;
+    let client = GitHubClient::new(token);
+    client.get_authenticated_user().await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn list_repos(app_handle: tauri::AppHandle) -> Result<Vec<Repo>, String> {
     let token = get_token_from_store(&app_handle, TokenType::GitHub)?;
     let client = GitHubClient::new(token);
