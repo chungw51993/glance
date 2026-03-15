@@ -86,7 +86,6 @@ interface GitProviderInfo {
   label: string;
   placeholder: string;
   hint: string;
-  comingSoon: boolean;
 }
 
 const gitProviders: GitProviderInfo[] = [
@@ -95,21 +94,18 @@ const gitProviders: GitProviderInfo[] = [
     label: "GitHub",
     placeholder: "ghp_...",
     hint: "Requires repo scope. Add read:org to also see PRs assigned to your teams.",
-    comingSoon: false,
   },
   {
     key: "git_lab",
     label: "GitLab",
     placeholder: "glpat-...",
     hint: "Requires api scope. Generate from Settings > Access Tokens in GitLab.",
-    comingSoon: true,
   },
   {
     key: "bitbucket",
     label: "Bitbucket",
     placeholder: "ATBB...",
     hint: "Create an App Password with Repositories and Pull Requests permissions.",
-    comingSoon: true,
   },
 ];
 
@@ -254,14 +250,7 @@ export function AccountSettings({
               <SelectContent>
                 {gitProviders.map((p) => (
                   <SelectItem key={p.key} value={p.key}>
-                    <div className="flex items-center gap-2">
-                      {p.label}
-                      {p.comingSoon && (
-                        <Badge variant="outline" className="text-[10px] px-1 py-0">
-                          Coming soon
-                        </Badge>
-                      )}
-                    </div>
+                    {p.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -277,11 +266,6 @@ export function AccountSettings({
             onDelete={() => onDeleteGitToken(gitProviderType)}
           />
 
-          {currentGitProvider.comingSoon && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
-              {currentGitProvider.label} integration is coming soon. You can save your token now and it will be ready when support is added.
-            </p>
-          )}
         </CardContent>
       </Card>
       <Card>
